@@ -1,0 +1,601 @@
+2026-06-27 10:45:14 | DEBUG    | mobile_automation | logger.py:123 | 日志系统初始化完成，级别=DEBUG，文件=logs\26_06_27_10_45_14\mobile_automation.log
+2026-06-27 10:45:14 | INFO     | mobile_automation.__main__ | main.py:122 | ============================================================
+2026-06-27 10:45:14 | INFO     | mobile_automation.__main__ | main.py:123 | 移动端 AI 自动化框架启动
+2026-06-27 10:45:14 | INFO     | mobile_automation.__main__ | main.py:124 | ============================================================
+2026-06-27 10:45:14 | INFO     | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:96 | DeviceManager 单例初始化完成
+2026-06-27 10:45:14 | INFO     | mobile_automation.__main__ | main.py:128 | 连接设备: serial=自动选择
+2026-06-27 10:45:14 | DEBUG    | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:114 | adb devices 输出: 2 行
+2026-06-27 10:45:14 | INFO     | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:129 | 发现 1 台设备，其中 1 台在线
+2026-06-27 10:45:14 | INFO     | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:172 | 未指定设备，自动选择: 127.0.0.1:5555
+2026-06-27 10:45:14 | INFO     | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:174 | 正在连接设备: 127.0.0.1:5555
+2026-06-27 10:45:15 | INFO     | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:36 | U2Controller 初始化成功，设备: 127.0.0.1:5555
+2026-06-27 10:45:15 | INFO     | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:181 | uiautomator2 连接成功: 127.0.0.1:5555
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:36 | ADBController 初始化，设备: 127.0.0.1:5555
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:330 | 屏幕尺寸（u2）: 1080x1920
+2026-06-27 10:45:15 | INFO     | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:197 | 设备连接完成（u2 + ADB）: 127.0.0.1:5555
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:51 | U2Controller 健康检查通过，设备: 127.0.0.1:5555
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:234 | 设备健康检查通过: 127.0.0.1:5555
+2026-06-27 10:45:15 | INFO     | mobile_automation.__main__ | main.py:132 | 设备连接成功: serial=127.0.0.1:5555
+2026-06-27 10:45:15 | INFO     | mobile_automation.__main__ | main.py:135 | 屏幕尺寸: 1080x1920
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:38 | ScreenCapture 初始化完成
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:75 | 弹窗规则加载: type=permission_dialog, strategy=allow, priority=10, keywords=['允许', '拒绝', 'allow', 'deny']
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:75 | 弹窗规则加载: type=update_dialog, strategy=cancel, priority=8, keywords=['更新', '升级', 'update', 'later']
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:75 | 弹窗规则加载: type=agreement_dialog, strategy=allow, priority=10, keywords=['用户协议', '隐私政策', '同意']
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:75 | 弹窗规则加载: type=ad_popup, strategy=dismiss, priority=5, keywords=['广告', 'ad', 'skip']
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:75 | 弹窗规则加载: type=unknown, strategy=report_to_llm, priority=0, keywords=[]
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.popup.pattern_rules | pattern_rules.py:71 | PatternRules 初始化完成，共 5 条规则
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:62 | PopupHandler 初始化完成
+2026-06-27 10:45:15 | INFO     | mobile_automation.src.mobile_automation.llm.llm_service | llm_service.py:68 | LLMServiceFactory 创建 Adapter: provider=qwen, cls=QwenAdapter
+2026-06-27 10:45:15 | INFO     | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:62 | QwenAdapter 初始化: model=qwen3.6-flash, base_url=https://dashscope.aliyuncs.com/compatible-mode/v1
+2026-06-27 10:45:15 | INFO     | mobile_automation.src.mobile_automation.llm.llm_service | llm_service.py:113 | LLMService 初始化: provider=qwen
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.executor.click_executor | click_executor.py:41 | ClickExecutor 初始化完成
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.executor.click_executor | click_executor.py:41 | ClickExecutor 初始化完成
+2026-06-27 10:45:15 | DEBUG    | mobile_automation.src.mobile_automation.executor.click_executor | click_executor.py:41 | ClickExecutor 初始化完成
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.executor.type_executor | type_executor.py:40 | TypeExecutor 初始化完成
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.executor.type_executor | type_executor.py:40 | TypeExecutor 初始化完成
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.executor.swipe_executor | swipe_executor.py:49 | SwipeExecutor 初始化完成
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.executor.swipe_executor | swipe_executor.py:49 | SwipeExecutor 初始化完成
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.executor.swipe_executor | swipe_executor.py:49 | SwipeExecutor 初始化完成
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.executor.wait_executor | wait_executor.py:40 | WaitExecutor 初始化完成
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:67 | ActionExecutor 初始化完成，已注册 9 个子执行器
+2026-06-27 10:45:16 | INFO     | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:58 | TokenBudgetManager 初始化: provider=qwen, context=32000, input_budget=27904
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:49 | PageChangeDetector 初始化完成
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:102 | StepRunner 初始化完成
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:70 | TaskOrchestrator 初始化完成
+2026-06-27 10:45:16 | INFO     | mobile_automation.__main__ | main.py:155 | 所有模块初始化完成
+2026-06-27 10:45:16 | INFO     | mobile_automation.__main__ | main.py:177 | 开始执行任务: goal=打开系统设置，进入关于手机，滑动到最后查看当前的手机型号信息是否是SM-S9211
+2026-06-27 10:45:16 | INFO     | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:187 | TokenBudgetManager 已重置 total_used=0
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:126 | StepRunner 已绑定 TokenBudget: provider=qwen
+2026-06-27 10:45:16 | INFO     | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:126 | 归档目录创建完成: reports\26_06_27_10_45_16\9a44d05e
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:114 | StepRunner 已绑定归档器: reports\26_06_27_10_45_16\9a44d05e
+2026-06-27 10:45:16 | INFO     | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:115 | 任务 9a44d05e 开始执行: user_goal=打开系统设置，进入关于手机，滑动到最后查看当前的手机型号信息是否是SM-S9211, max_steps=30
+2026-06-27 10:45:16 | INFO     | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:125 | 任务 9a44d05e 执行步骤 1/30
+2026-06-27 10:45:16 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:169 | Step 1 开始执行 (attempt 1/3)
+2026-06-27 10:45:16 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:16 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 1840486 字节
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 1840486 字节
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=46676 字节
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 46676 字节
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 46676 字节 -> 输出 62236 字符
+2026-06-27 10:45:16 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 44056 字符
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 44056 字符
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 55
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 55 个 element_id
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 55 个节点
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 220 个网格、55 个元素
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 2817 字符
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 62236 字符，UI 树 55 节点
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_01\screenshot.png (300804 字节)
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:222 | 原始 XML 已保存: reports\26_06_27_10_45_16\9a44d05e\step_01\xml_raw.xml (44056 字符)
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:250 | 结构化摘要已保存: reports\26_06_27_10_45_16\9a44d05e\step_01\summary.txt (2817 字符)
+2026-06-27 10:45:17 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:101 | 弹窗检测命中覆盖层: nodes=4
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:44 | 弹窗检测结果: type=unknown, confidence=0.70, nodes=4
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.popup.pattern_rules | pattern_rules.py:93 | 规则匹配: type=unknown -> strategy=report_to_llm
+2026-06-27 10:45:17 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:139 | 处理弹窗: type=unknown, strategy=report_to_llm
+2026-06-27 10:45:17 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:151 | 弹窗类型 unknown 需上报 LLM 决策
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=1, 总消息数=2, 策略=none
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.llm.llm_service | llm_service.py:155 | LLMService.chat: provider=qwen, 消息数=2
+2026-06-27 10:45:17 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:114 | QwenAdapter.chat 发送消息: 2 条, model=qwen3.6-flash
+2026-06-27 10:45:20 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:125 | QwenAdapter.chat 收到回复: 159 字符
+2026-06-27 10:45:20 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:328 | Step 1 LLM 原始响应: ```json
+{
+  "action_type": "open_app",
+  "params": {
+    "package_name": "com.android.settings"
+  },
+  "reason": "用户目标是打开系统设置，根据规则优先使用 open_app 直接启动设置应用"
+}
+```
+2026-06-27 10:45:20 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:282 | LLM 请求已保存: reports\26_06_27_10_45_16\9a44d05e\step_01\llm_request.json
+2026-06-27 10:45:20 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:313 | LLM 响应已保存: reports\26_06_27_10_45_16\9a44d05e\step_01\llm_response.json
+2026-06-27 10:45:20 | DEBUG    | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:87 | TokenBudgetManager 记录消耗: +3557, 总计=3557
+2026-06-27 10:45:20 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:188 | Step 1 LLM 决策完成: type=open_app, element_id=None
+2026-06-27 10:45:20 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:96 | 执行 Action: type=open_app, element_id=None, reason=用户目标是打开系统设置，根据规则优先使用 open_app 直接启动设置应用
+2026-06-27 10:45:21 | INFO     | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:371 | 启动应用: com.android.settings
+2026-06-27 10:45:21 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:155 | 系统操作执行成功: type=open_app
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:51 | U2Controller 健康检查通过，设备: 127.0.0.1:5555
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:234 | 设备健康检查通过: 127.0.0.1:5555
+2026-06-27 10:45:21 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:21 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 152360 字节
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 152360 字节
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=30293 字节
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 30293 字节
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 30293 字节 -> 输出 40392 字符
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 37110 字符
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 37110 字符
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 33
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 33 个 element_id
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 33 个节点
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 220 个网格、33 个元素
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 1352 字符
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 40392 字符，UI 树 33 节点
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_01\screenshot_after.png (111214 字节)
+2026-06-27 10:45:21 | INFO     | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:72 | 首次感知，保存页面快照
+2026-06-27 10:45:21 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:230 | Step 1 执行成功
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:331 | 步骤 1 归档数据已注册
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.models.task | task.py:155 | 任务 9a44d05e 步骤 1 完成，当前 Token 消耗: 0
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:153 | 任务 9a44d05e 步骤 1 成功
+2026-06-27 10:45:21 | INFO     | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:125 | 任务 9a44d05e 执行步骤 2/30
+2026-06-27 10:45:21 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:169 | Step 2 开始执行 (attempt 1/3)
+2026-06-27 10:45:21 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:21 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 151330 字节
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 151330 字节
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=30651 字节
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 30651 字节
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 30651 字节 -> 输出 40868 字符
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 37110 字符
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 37110 字符
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 33
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 33 个 element_id
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 33 个节点
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 220 个网格、33 个元素
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 1352 字符
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 40868 字符，UI 树 33 节点
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_02\screenshot.png (111521 字节)
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:222 | 原始 XML 已保存: reports\26_06_27_10_45_16\9a44d05e\step_02\xml_raw.xml (37110 字符)
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:250 | 结构化摘要已保存: reports\26_06_27_10_45_16\9a44d05e\step_02\summary.txt (1352 字符)
+2026-06-27 10:45:21 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:101 | 弹窗检测命中覆盖层: nodes=2
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:44 | 弹窗检测结果: type=unknown, confidence=0.70, nodes=2
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.popup.pattern_rules | pattern_rules.py:93 | 规则匹配: type=unknown -> strategy=report_to_llm
+2026-06-27 10:45:21 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:139 | 处理弹窗: type=unknown, strategy=report_to_llm
+2026-06-27 10:45:21 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:151 | 弹窗类型 unknown 需上报 LLM 决策
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 1 条 (策略=none)
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=2, 总消息数=3, 策略=none
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 1 条 (策略=none)
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=2, 总消息数=3, 策略=none
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.llm.llm_service | llm_service.py:155 | LLMService.chat: provider=qwen, 消息数=3
+2026-06-27 10:45:21 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:114 | QwenAdapter.chat 发送消息: 3 条, model=qwen3.6-flash
+2026-06-27 10:45:25 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:125 | QwenAdapter.chat 收到回复: 143 字符
+2026-06-27 10:45:25 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:328 | Step 2 LLM 原始响应: ```json
+{
+  "action_type": "scroll",
+  "params": {
+    "direction": "up"
+  },
+  "reason": "当前页面未显示'关于手机'选项，需要向上滚动以查看列表底部的更多内容，找到'关于手机'入口"
+}
+```
+2026-06-27 10:45:25 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:282 | LLM 请求已保存: reports\26_06_27_10_45_16\9a44d05e\step_02\llm_request.json
+2026-06-27 10:45:25 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:313 | LLM 响应已保存: reports\26_06_27_10_45_16\9a44d05e\step_02\llm_response.json
+2026-06-27 10:45:25 | DEBUG    | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:87 | TokenBudgetManager 记录消耗: +3509, 总计=7066
+2026-06-27 10:45:25 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:188 | Step 2 LLM 决策完成: type=scroll, element_id=None
+2026-06-27 10:45:25 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:96 | 执行 Action: type=scroll, element_id=None, reason=当前页面未显示'关于手机'选项，需要向上滚动以查看列表底部的更多内容，找到'关于手机'入口
+2026-06-27 10:45:26 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:297 | 滑动 (540,960) -> (540,269), steps=55
+2026-06-27 10:45:26 | INFO     | mobile_automation.src.mobile_automation.executor.swipe_executor | swipe_executor.py:189 | 滚动操作成功: direction=up, (540,960) -> (540,269), steps=55
+2026-06-27 10:45:26 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:117 | Action 执行成功: type=scroll
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:51 | U2Controller 健康检查通过，设备: 127.0.0.1:5555
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:234 | 设备健康检查通过: 127.0.0.1:5555
+2026-06-27 10:45:27 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:27 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 147917 字节
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 147917 字节
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=30111 字节
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 30111 字节
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 30111 字节 -> 输出 40148 字符
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 37105 字符
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 37105 字符
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 33
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 33 个 element_id
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 33 个节点
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 220 个网格、33 个元素
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 1344 字符
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 40148 字符，UI 树 33 节点
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_02\screenshot_after.png (110371 字节)
+2026-06-27 10:45:27 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:156 | bounds 变化 25 个节点
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:95 | 页面变化检测: 有变化 -> 结构差异(0.76) 视觉差异(0.81) 综合(0.77)
+2026-06-27 10:45:28 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:230 | Step 2 执行成功
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:331 | 步骤 2 归档数据已注册
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.models.task | task.py:155 | 任务 9a44d05e 步骤 2 完成，当前 Token 消耗: 0
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:153 | 任务 9a44d05e 步骤 2 成功
+2026-06-27 10:45:28 | INFO     | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:125 | 任务 9a44d05e 执行步骤 3/30
+2026-06-27 10:45:28 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:169 | Step 3 开始执行 (attempt 1/3)
+2026-06-27 10:45:28 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:28 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 147917 字节
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 147917 字节
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=30111 字节
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 30111 字节
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 30111 字节 -> 输出 40148 字符
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 37105 字符
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 37105 字符
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 33
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 33 个 element_id
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 33 个节点
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 220 个网格、33 个元素
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 1344 字符
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 40148 字符，UI 树 33 节点
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_03\screenshot.png (110371 字节)
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:222 | 原始 XML 已保存: reports\26_06_27_10_45_16\9a44d05e\step_03\xml_raw.xml (37105 字符)
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:250 | 结构化摘要已保存: reports\26_06_27_10_45_16\9a44d05e\step_03\summary.txt (1344 字符)
+2026-06-27 10:45:28 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:101 | 弹窗检测命中覆盖层: nodes=2
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:44 | 弹窗检测结果: type=unknown, confidence=0.70, nodes=2
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.popup.pattern_rules | pattern_rules.py:93 | 规则匹配: type=unknown -> strategy=report_to_llm
+2026-06-27 10:45:28 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:139 | 处理弹窗: type=unknown, strategy=report_to_llm
+2026-06-27 10:45:28 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:151 | 弹窗类型 unknown 需上报 LLM 决策
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 2 条 (策略=none)
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=3, 总消息数=3, 策略=none
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 2 条 (策略=none)
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=3, 总消息数=3, 策略=none
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.llm.llm_service | llm_service.py:155 | LLMService.chat: provider=qwen, 消息数=3
+2026-06-27 10:45:28 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:114 | QwenAdapter.chat 发送消息: 3 条, model=qwen3.6-flash
+2026-06-27 10:45:30 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:125 | QwenAdapter.chat 收到回复: 168 字符
+2026-06-27 10:45:30 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:328 | Step 3 LLM 原始响应: ```json
+{
+  "action_type": "scroll",
+  "params": {
+    "element_id": "#33",
+    "direction": "up"
+  },
+  "reason": "当前页面未显示'关于手机'选项，需要向上滚动以查看列表底部的更多内容，找到'关于手机'入口"
+}
+```
+2026-06-27 10:45:30 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:282 | LLM 请求已保存: reports\26_06_27_10_45_16\9a44d05e\step_03\llm_request.json
+2026-06-27 10:45:30 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:313 | LLM 响应已保存: reports\26_06_27_10_45_16\9a44d05e\step_03\llm_response.json
+2026-06-27 10:45:30 | DEBUG    | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:87 | TokenBudgetManager 记录消耗: +4180, 总计=11246
+2026-06-27 10:45:30 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:188 | Step 3 LLM 决策完成: type=scroll, element_id=#33
+2026-06-27 10:45:30 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:371 | element_id #33 解析为坐标 (540, 996), ui_element=com.android.settings:id/recycler_view
+2026-06-27 10:45:30 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:96 | 执行 Action: type=scroll, element_id=#33, reason=当前页面未显示'关于手机'选项，需要向上滚动以查看列表底部的更多内容，找到'关于手机'入口
+2026-06-27 10:45:31 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:297 | 滑动 (540,960) -> (540,269), steps=55
+2026-06-27 10:45:31 | INFO     | mobile_automation.src.mobile_automation.executor.swipe_executor | swipe_executor.py:189 | 滚动操作成功: direction=up, (540,960) -> (540,269), steps=55
+2026-06-27 10:45:31 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:117 | Action 执行成功: type=scroll
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:51 | U2Controller 健康检查通过，设备: 127.0.0.1:5555
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:234 | 设备健康检查通过: 127.0.0.1:5555
+2026-06-27 10:45:32 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:32 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 170545 字节
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 170545 字节
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=34152 字节
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 34152 字节
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 34152 字节 -> 输出 45536 字符
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 37124 字符
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 37124 字符
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 33
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 33 个 element_id
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 33 个节点
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 220 个网格、33 个元素
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 1361 字符
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 45536 字符，UI 树 33 节点
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_03\screenshot_after.png (126645 字节)
+2026-06-27 10:45:32 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:156 | bounds 变化 26 个节点
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:95 | 页面变化检测: 有变化 -> 结构差异(0.79) 视觉差异(0.81) 综合(0.79)
+2026-06-27 10:45:33 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:230 | Step 3 执行成功
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:331 | 步骤 3 归档数据已注册
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.models.task | task.py:155 | 任务 9a44d05e 步骤 3 完成，当前 Token 消耗: 0
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:153 | 任务 9a44d05e 步骤 3 成功
+2026-06-27 10:45:33 | INFO     | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:125 | 任务 9a44d05e 执行步骤 4/30
+2026-06-27 10:45:33 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:169 | Step 4 开始执行 (attempt 1/3)
+2026-06-27 10:45:33 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:33 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 170545 字节
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 170545 字节
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=34152 字节
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 34152 字节
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 34152 字节 -> 输出 45536 字符
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 37124 字符
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 37124 字符
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 33
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 33 个 element_id
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 33 个节点
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 220 个网格、33 个元素
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 1361 字符
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 45536 字符，UI 树 33 节点
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_04\screenshot.png (126645 字节)
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:222 | 原始 XML 已保存: reports\26_06_27_10_45_16\9a44d05e\step_04\xml_raw.xml (37124 字符)
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:250 | 结构化摘要已保存: reports\26_06_27_10_45_16\9a44d05e\step_04\summary.txt (1361 字符)
+2026-06-27 10:45:33 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:101 | 弹窗检测命中覆盖层: nodes=2
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:44 | 弹窗检测结果: type=unknown, confidence=0.70, nodes=2
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.popup.pattern_rules | pattern_rules.py:93 | 规则匹配: type=unknown -> strategy=report_to_llm
+2026-06-27 10:45:33 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:139 | 处理弹窗: type=unknown, strategy=report_to_llm
+2026-06-27 10:45:33 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:151 | 弹窗类型 unknown 需上报 LLM 决策
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 3 条 (策略=none)
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=4, 总消息数=3, 策略=none
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 3 条 (策略=none)
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=4, 总消息数=3, 策略=none
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.llm.llm_service | llm_service.py:155 | LLMService.chat: provider=qwen, 消息数=3
+2026-06-27 10:45:33 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:114 | QwenAdapter.chat 发送消息: 3 条, model=qwen3.6-flash
+2026-06-27 10:45:35 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:125 | QwenAdapter.chat 收到回复: 143 字符
+2026-06-27 10:45:35 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:328 | Step 4 LLM 原始响应: ```json
+{
+  "action_type": "swipe",
+  "params": {
+    "direction": "up"
+  },
+  "reason": "当前页面未显示'关于手机'选项，需要向上滚动以查看列表底部的更多设置项，找到'关于手机'入口"
+}
+```
+2026-06-27 10:45:35 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:282 | LLM 请求已保存: reports\26_06_27_10_45_16\9a44d05e\step_04\llm_request.json
+2026-06-27 10:45:35 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:313 | LLM 响应已保存: reports\26_06_27_10_45_16\9a44d05e\step_04\llm_response.json
+2026-06-27 10:45:35 | DEBUG    | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:87 | TokenBudgetManager 记录消耗: +4872, 总计=16118
+2026-06-27 10:45:35 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:188 | Step 4 LLM 决策完成: type=swipe, element_id=None
+2026-06-27 10:45:35 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:96 | 执行 Action: type=swipe, element_id=None, reason=当前页面未显示'关于手机'选项，需要向上滚动以查看列表底部的更多设置项，找到'关于手机'入口
+2026-06-27 10:45:37 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:297 | 滑动 (540,960) -> (540,269), steps=100
+2026-06-27 10:45:37 | INFO     | mobile_automation.src.mobile_automation.executor.swipe_executor | swipe_executor.py:116 | 方向滑动成功: direction=up, (540,960) -> (540,269)
+2026-06-27 10:45:37 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:117 | Action 执行成功: type=swipe
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:51 | U2Controller 健康检查通过，设备: 127.0.0.1:5555
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:234 | 设备健康检查通过: 127.0.0.1:5555
+2026-06-27 10:45:38 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:38 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 171143 字节
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 171143 字节
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=33898 字节
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 33898 字节
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 33898 字节 -> 输出 45200 字符
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 37128 字符
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 37128 字符
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 33
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 33 个 element_id
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 33 个节点
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 220 个网格、33 个元素
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 1362 字符
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 45200 字符，UI 树 33 节点
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_04\screenshot_after.png (123475 字节)
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:156 | bounds 变化 25 个节点
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:95 | 页面变化检测: 有变化 -> 结构差异(0.76) 视觉差异(0.76) 综合(0.76)
+2026-06-27 10:45:38 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:230 | Step 4 执行成功
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:331 | 步骤 4 归档数据已注册
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.models.task | task.py:155 | 任务 9a44d05e 步骤 4 完成，当前 Token 消耗: 0
+2026-06-27 10:45:38 | DEBUG    | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:153 | 任务 9a44d05e 步骤 4 成功
+2026-06-27 10:45:38 | INFO     | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:125 | 任务 9a44d05e 执行步骤 5/30
+2026-06-27 10:45:38 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:169 | Step 5 开始执行 (attempt 1/3)
+2026-06-27 10:45:39 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:39 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 171143 字节
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 171143 字节
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=33898 字节
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 33898 字节
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 33898 字节 -> 输出 45200 字符
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 37128 字符
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 37128 字符
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 33
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 33 个 element_id
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 33 个节点
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 220 个网格、33 个元素
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 1362 字符
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 45200 字符，UI 树 33 节点
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_05\screenshot.png (123475 字节)
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:222 | 原始 XML 已保存: reports\26_06_27_10_45_16\9a44d05e\step_05\xml_raw.xml (37128 字符)
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:250 | 结构化摘要已保存: reports\26_06_27_10_45_16\9a44d05e\step_05\summary.txt (1362 字符)
+2026-06-27 10:45:39 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:101 | 弹窗检测命中覆盖层: nodes=2
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:44 | 弹窗检测结果: type=unknown, confidence=0.70, nodes=2
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.popup.pattern_rules | pattern_rules.py:93 | 规则匹配: type=unknown -> strategy=report_to_llm
+2026-06-27 10:45:39 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:139 | 处理弹窗: type=unknown, strategy=report_to_llm
+2026-06-27 10:45:39 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:151 | 弹窗类型 unknown 需上报 LLM 决策
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 4 条 (策略=none)
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=5, 总消息数=3, 策略=none
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 4 条 (策略=none)
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=5, 总消息数=3, 策略=none
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.llm.llm_service | llm_service.py:155 | LLMService.chat: provider=qwen, 消息数=3
+2026-06-27 10:45:39 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:114 | QwenAdapter.chat 发送消息: 3 条, model=qwen3.6-flash
+2026-06-27 10:45:41 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:125 | QwenAdapter.chat 收到回复: 132 字符
+2026-06-27 10:45:41 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:328 | Step 5 LLM 原始响应: ```json
+{
+  "action_type": "click",
+  "params": {
+    "element_id": "#22"
+  },
+  "reason": "点击'关于手机'选项以进入详情页，后续将滑动查看完整的手机型号信息"
+}
+```
+2026-06-27 10:45:41 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:282 | LLM 请求已保存: reports\26_06_27_10_45_16\9a44d05e\step_05\llm_request.json
+2026-06-27 10:45:41 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:313 | LLM 响应已保存: reports\26_06_27_10_45_16\9a44d05e\step_05\llm_response.json
+2026-06-27 10:45:41 | DEBUG    | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:87 | TokenBudgetManager 记录消耗: +5558, 总计=21676
+2026-06-27 10:45:41 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:188 | Step 5 LLM 决策完成: type=click, element_id=#22
+2026-06-27 10:45:41 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:371 | element_id #22 解析为坐标 (336, 1774), ui_element=android:id/title
+2026-06-27 10:45:41 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:96 | 执行 Action: type=click, element_id=#22, reason=点击'关于手机'选项以进入详情页，后续将滑动查看完整的手机型号信息
+2026-06-27 10:45:44 | WARNING  | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:200 | 通过文本未找到元素: android:id/title (精确=False)
+2026-06-27 10:45:47 | WARNING  | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:200 | 通过文本未找到元素: android:id/title (精确=False)
+2026-06-27 10:45:47 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:146 | 点击坐标 (336, 1774)
+2026-06-27 10:45:47 | DEBUG    | mobile_automation.src.mobile_automation.executor.click_executor | click_executor.py:134 | 坐标单击成功: (336, 1774)
+2026-06-27 10:45:47 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:117 | Action 执行成功: type=click
+2026-06-27 10:45:47 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:51 | U2Controller 健康检查通过，设备: 127.0.0.1:5555
+2026-06-27 10:45:47 | DEBUG    | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:234 | 设备健康检查通过: 127.0.0.1:5555
+2026-06-27 10:45:48 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:48 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 102751 字节
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 102751 字节
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=21128 字节
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 21128 字节
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 21128 字节 -> 输出 28172 字符
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 29767 字符
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 29767 字符
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 21
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 21 个 element_id
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 21 个节点
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 209 个网格、21 个元素
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 820 字符
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 28172 字符，UI 树 21 节点
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_05\screenshot_after.png (60061 字节)
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:154 | 删除 12 个节点
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:156 | bounds 变化 17 个节点
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:95 | 页面变化检测: 有变化 -> 结构差异(0.88) 视觉差异(0.76) 综合(0.84)
+2026-06-27 10:45:48 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:230 | Step 5 执行成功
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:331 | 步骤 5 归档数据已注册
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.models.task | task.py:155 | 任务 9a44d05e 步骤 5 完成，当前 Token 消耗: 0
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:153 | 任务 9a44d05e 步骤 5 成功
+2026-06-27 10:45:48 | INFO     | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:125 | 任务 9a44d05e 执行步骤 6/30
+2026-06-27 10:45:48 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:169 | Step 6 开始执行 (attempt 1/3)
+2026-06-27 10:45:48 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:48 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 84295 字节
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 84295 字节
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=19687 字节
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 19687 字节
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 19687 字节 -> 输出 26252 字符
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 29767 字符
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 29767 字符
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 21
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 21 个 element_id
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 21 个节点
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 209 个网格、21 个元素
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 820 字符
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 26252 字符，UI 树 21 节点
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_06\screenshot.png (67279 字节)
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:222 | 原始 XML 已保存: reports\26_06_27_10_45_16\9a44d05e\step_06\xml_raw.xml (29767 字符)
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:250 | 结构化摘要已保存: reports\26_06_27_10_45_16\9a44d05e\step_06\summary.txt (820 字符)
+2026-06-27 10:45:48 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:101 | 弹窗检测命中覆盖层: nodes=1
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:44 | 弹窗检测结果: type=unknown, confidence=0.70, nodes=1
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.popup.pattern_rules | pattern_rules.py:93 | 规则匹配: type=unknown -> strategy=report_to_llm
+2026-06-27 10:45:48 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:139 | 处理弹窗: type=unknown, strategy=report_to_llm
+2026-06-27 10:45:48 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:151 | 弹窗类型 unknown 需上报 LLM 决策
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 5 条 (策略=none)
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=6, 总消息数=3, 策略=none
+2026-06-27 10:45:48 | WARNING  | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:109 | TokenBudgetManager 触发压缩: 已用=21676, 当前步=5390, 阈值=22323
+2026-06-27 10:45:48 | INFO     | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:174 | TokenBudgetManager 压缩策略: none (估算=5390, 预算=27904)
+2026-06-27 10:45:48 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:314 | Step 6 触发 Token 压缩: 策略=none, 估算=5390, 已用=21676
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 5 条 (策略=none)
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=6, 总消息数=3, 策略=none
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.llm.llm_service | llm_service.py:155 | LLMService.chat: provider=qwen, 消息数=3
+2026-06-27 10:45:48 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:114 | QwenAdapter.chat 发送消息: 3 条, model=qwen3.6-flash
+2026-06-27 10:45:52 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:125 | QwenAdapter.chat 收到回复: 151 字符
+2026-06-27 10:45:52 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:328 | Step 6 LLM 原始响应: ```json
+{
+  "action_type": "scroll",
+  "params": {
+    "element_id": "#21",
+    "direction": "up"
+  },
+  "reason": "根据用户要求滑动到页面底部以查看完整的手机型号及相关信息"
+}
+```
+2026-06-27 10:45:52 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:282 | LLM 请求已保存: reports\26_06_27_10_45_16\9a44d05e\step_06\llm_request.json
+2026-06-27 10:45:52 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:313 | LLM 响应已保存: reports\26_06_27_10_45_16\9a44d05e\step_06\llm_response.json
+2026-06-27 10:45:52 | DEBUG    | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:87 | TokenBudgetManager 记录消耗: +5700, 总计=27376
+2026-06-27 10:45:52 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:188 | Step 6 LLM 决策完成: type=scroll, element_id=#21
+2026-06-27 10:45:52 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:371 | element_id #21 解析为坐标 (540, 1176), ui_element=com.android.settings:id/recycler_view
+2026-06-27 10:45:52 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:96 | 执行 Action: type=scroll, element_id=#21, reason=根据用户要求滑动到页面底部以查看完整的手机型号及相关信息
+2026-06-27 10:45:53 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:297 | 滑动 (540,960) -> (540,269), steps=55
+2026-06-27 10:45:53 | INFO     | mobile_automation.src.mobile_automation.executor.swipe_executor | swipe_executor.py:189 | 滚动操作成功: direction=up, (540,960) -> (540,269), steps=55
+2026-06-27 10:45:53 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:117 | Action 执行成功: type=scroll
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:51 | U2Controller 健康检查通过，设备: 127.0.0.1:5555
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:234 | 设备健康检查通过: 127.0.0.1:5555
+2026-06-27 10:45:54 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:54 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 82511 字节
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 82511 字节
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=20288 字节
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 20288 字节
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 20288 字节 -> 输出 27052 字符
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 30681 字符
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 30681 字符
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 22
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 22 个 element_id
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 22 个节点
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 220 个网格、22 个元素
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 902 字符
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 27052 字符，UI 树 22 节点
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_06\screenshot_after.png (69644 字节)
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:152 | 新增 1 个节点
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:156 | bounds 变化 17 个节点
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.perception.page_diff | page_diff.py:95 | 页面变化检测: 有变化 -> 结构差异(0.86) 视觉差异(0.86) 综合(0.86)
+2026-06-27 10:45:54 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:230 | Step 6 执行成功
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:331 | 步骤 6 归档数据已注册
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.models.task | task.py:155 | 任务 9a44d05e 步骤 6 完成，当前 Token 消耗: 0
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:153 | 任务 9a44d05e 步骤 6 成功
+2026-06-27 10:45:54 | INFO     | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:125 | 任务 9a44d05e 执行步骤 7/30
+2026-06-27 10:45:54 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:169 | Step 7 开始执行 (attempt 1/3)
+2026-06-27 10:45:54 | ERROR    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:113 | uiautomator2 截图失败: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:54 | WARNING  | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:70 | uiautomator2 截图失败，尝试 ADB fallback: object of type 'JpegImageFile' has no len()
+2026-06-27 10:45:54 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:94 | 执行 ADB 截图
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.device.adb_controller | adb_controller.py:100 | ADB 截图成功，大小: 82511 字节
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:81 | 原始截图获取成功，来源: ADB，大小: 82511 字节
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:50 | 图片缩放: 1080x1920 -> 405x720
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:90 | 图片压缩: 格式=JPEG 质量=85 大小=20288 字节
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:86 | 截图处理后大小: 20288 字节
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.image_util | image_util.py:112 | Base64 编码完成，输入 20288 字节 -> 输出 27052 字符
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:57 | UITreeExtractor 初始化完成
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:127 | UI dump 成功，XML 长度: 30681 字符
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:78 | 原始 XML 长度: 30681 字符
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:85 | 展平后节点数: 22
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:220 | 本地索引分配 22 个 element_id
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:88 | 本地索引构建完成: 22 个节点
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.models.perception | perception.py:327 | 空间索引构建完成，共 220 个网格、22 个元素
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.ui_tree | ui_tree.py:95 | 结构化摘要构建完成，长度: 902 字符
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.perception.screen_capture | screen_capture.py:137 | capture_with_ui_tree 完成，截图 27052 字符，UI 树 22 节点
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_07\screenshot.png (69644 字节)
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:222 | 原始 XML 已保存: reports\26_06_27_10_45_16\9a44d05e\step_07\xml_raw.xml (30681 字符)
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:250 | 结构化摘要已保存: reports\26_06_27_10_45_16\9a44d05e\step_07\summary.txt (902 字符)
+2026-06-27 10:45:55 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:101 | 弹窗检测命中覆盖层: nodes=1
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.popup.models | models.py:44 | 弹窗检测结果: type=unknown, confidence=0.70, nodes=1
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.popup.pattern_rules | pattern_rules.py:93 | 规则匹配: type=unknown -> strategy=report_to_llm
+2026-06-27 10:45:55 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:139 | 处理弹窗: type=unknown, strategy=report_to_llm
+2026-06-27 10:45:55 | INFO     | mobile_automation.src.mobile_automation.popup.popup_handler | popup_handler.py:151 | 弹窗类型 unknown 需上报 LLM 决策
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 6 条 (策略=none)
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=7, 总消息数=3, 策略=none
+2026-06-27 10:45:55 | WARNING  | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:109 | TokenBudgetManager 触发压缩: 已用=27376, 当前步=5845, 阈值=22323
+2026-06-27 10:45:55 | INFO     | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:174 | TokenBudgetManager 压缩策略: none (估算=5845, 预算=27904)
+2026-06-27 10:45:55 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:314 | Step 7 触发 Token 压缩: 策略=none, 估算=5845, 已用=27376
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:90 | DecisionPromptBuilder 添加历史上下文: 6 条 (策略=none)
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.prompts.decision_prompt | decision_prompt.py:113 | DecisionPromptBuilder 构建完成: step=7, 总消息数=3, 策略=none
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.llm.llm_service | llm_service.py:155 | LLMService.chat: provider=qwen, 消息数=3
+2026-06-27 10:45:55 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:114 | QwenAdapter.chat 发送消息: 3 条, model=qwen3.6-flash
+2026-06-27 10:45:57 | DEBUG    | mobile_automation.src.mobile_automation.llm.qwen_adapter | qwen_adapter.py:125 | QwenAdapter.chat 收到回复: 190 字符
+2026-06-27 10:45:57 | DEBUG    | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:328 | Step 7 LLM 原始响应: ```json
+{
+  "action_type": "verify",
+  "params": {
+    "match": false,
+    "expected": "SM-S9211",
+    "actual": "SM-S9210"
+  },
+  "reason": "当前手机型号为 SM-S9210，与需要验证的 SM-S9211 不匹配，任务完成"
+}
+```
+2026-06-27 10:45:57 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:282 | LLM 请求已保存: reports\26_06_27_10_45_16\9a44d05e\step_07\llm_request.json
+2026-06-27 10:45:57 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:313 | LLM 响应已保存: reports\26_06_27_10_45_16\9a44d05e\step_07\llm_response.json
+2026-06-27 10:45:57 | DEBUG    | mobile_automation.src.mobile_automation.llm.token_budget | token_budget.py:87 | TokenBudgetManager 记录消耗: +6196, 总计=33572
+2026-06-27 10:45:57 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:188 | Step 7 LLM 决策完成: type=verify, element_id=None
+2026-06-27 10:45:57 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:96 | 执行 Action: type=verify, element_id=None, reason=当前手机型号为 SM-S9210，与需要验证的 SM-S9211 不匹配，任务完成
+2026-06-27 10:45:57 | INFO     | mobile_automation.src.mobile_automation.executor.action_executor | action_executor.py:155 | 系统操作执行成功: type=verify
+2026-06-27 10:45:57 | DEBUG    | mobile_automation.src.mobile_automation.device.u2_controller | u2_controller.py:51 | U2Controller 健康检查通过，设备: 127.0.0.1:5555
+2026-06-27 10:45:57 | DEBUG    | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:234 | 设备健康检查通过: 127.0.0.1:5555
+2026-06-27 10:45:57 | INFO     | mobile_automation.src.mobile_automation.core.step_runner | step_runner.py:210 | Step 7 执行成功 (动作=verify 无需验证页面变化)
+2026-06-27 10:45:57 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:194 | 截图已保存: reports\26_06_27_10_45_16\9a44d05e\step_07\screenshot_after.png (69644 字节)
+2026-06-27 10:45:57 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:331 | 步骤 7 归档数据已注册
+2026-06-27 10:45:57 | DEBUG    | mobile_automation.src.mobile_automation.models.task | task.py:155 | 任务 9a44d05e 步骤 7 完成，当前 Token 消耗: 0
+2026-06-27 10:45:57 | WARNING  | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:147 | 任务 9a44d05e 验证失败: 信息不匹配（match=false），reason=当前手机型号为 SM-S9210，与需要验证的 SM-S9211 不匹配，任务完成
+2026-06-27 10:45:57 | DEBUG    | mobile_automation.src.mobile_automation.reporting.archiver | archiver.py:154 | 任务元数据已保存: reports\26_06_27_10_45_16\9a44d05e\task_meta.json
+2026-06-27 10:45:57 | INFO     | mobile_automation.src.mobile_automation.reporting.report_generator | report_generator.py:93 | 报告已生成: reports\26_06_27_10_45_16\9a44d05e\report.md
+2026-06-27 10:45:57 | INFO     | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:188 | 任务 9a44d05e 报告已生成: reports\26_06_27_10_45_16\9a44d05e\report.md
+2026-06-27 10:45:57 | INFO     | mobile_automation.src.mobile_automation.core.orchestrator | orchestrator.py:190 | 任务 9a44d05e 结束: status=failed, steps=7, tokens=0
+2026-06-27 10:45:57 | INFO     | mobile_automation.src.mobile_automation.device.device_manager | device_manager.py:212 | 设备断开连接: 127.0.0.1:5555
+2026-06-27 10:45:57 | INFO     | mobile_automation.__main__ | main.py:235 | 设备连接已断开
+2026-06-27 10:45:57 | WARNING  | mobile_automation.__main__ | main.py:241 | 任务最终状态: failed，退出码 1
