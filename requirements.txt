@@ -1,0 +1,41 @@
+# ============================================================
+# mobile-automation —— 基于 Qwen-VL 的移动端 AI 自动化框架
+# ============================================================
+# 安装方式：
+#   pip install -r requirements.txt
+#   uv pip install -r requirements.txt
+# ============================================================
+
+# ========== 核心依赖 ==========
+
+# LLM 相关
+openai>=1.0.0                   # Qwen DashScope 兼容接口 + OpenAI GPT-4o
+anthropic>=0.30.0               # Claude API 调用
+
+# 设备交互
+uiautomator2>=2.16.0            # Android UI 自动化（主要交互方式）
+
+# 图像处理
+Pillow>=10.0.0                  # 图片缩放与格式转换
+opencv-python>=4.8.0            # SSIM 视觉比较
+scikit-image>=0.21.0            # structural_similarity
+
+# XML 解析
+lxml>=4.9.0                     # 快速 XML dump 解析
+
+# 配置管理
+pydantic>=2.0.0                 # 数据模型
+pydantic-settings>=2.0.0        # 环境变量配置管理
+
+# 工具
+python-dotenv>=1.0.0            # .env 文件加载
+
+# ========== 开发依赖 ==========
+
+pytest>=7.0.0                   # 测试框架
+pytest-mock>=3.0.0              # mock 支持
+pytest-asyncio>=0.21.0          # 异步测试
+pytest-cov>=4.0.0               # 覆盖率报告
+black>=23.0.0                   # 代码格式化
+ruff>=0.1.0                     # 代码检查（已取代 flake8 + isort）
+mypy>=1.0.0                     # 静态类型检查

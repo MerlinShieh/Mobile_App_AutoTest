@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.env
+logs/
+reports/
+.idea/
+.qwen/
+*.log
+
+*.egg-info/
+dist/
+build/
+qwen-code-export-*.json
