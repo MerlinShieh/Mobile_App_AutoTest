@@ -102,7 +102,7 @@ class TokenBudgetManager:
         bool
             True 表示需要压缩，False 表示预算充足。
         """
-        threshold: int = int(self.input_budget * 0.8)
+        threshold: int = int(self.input_budget * 1.0)
         total_needed: int = self.total_used + current_step_tokens
         need: bool = total_needed > threshold
         if need:

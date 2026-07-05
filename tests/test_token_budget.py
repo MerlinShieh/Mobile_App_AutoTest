@@ -71,8 +71,8 @@ class TestTokenBudgetManager:
         """验证超预算阈值时需要压缩。"""
         monkeypatch.setattr("mobile_automation.llm.token_budget.settings.llm.max_tokens", 4096)
         manager = TokenBudgetManager("qwen")
-        threshold = int(manager.input_budget * 0.8)
-        need = manager.needs_compression(threshold + 100)
+        threshold = int(manager.input_budget * 1.0)
+        need = manager.needs_compression(threshold + 1)
         assert need is True
 
     def test_estimate_messages_tokens_text_only(self):

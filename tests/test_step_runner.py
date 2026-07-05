@@ -190,11 +190,10 @@ class TestStepRunner:
         assert action.params.text == "hello"
 
     def test_parse_llm_response_invalid(self):
-        """验证解析无效 JSON 时返回默认 WAIT 操作。"""
+        """验证解析无效 JSON 时抛出异常。"""
         response = "这不是有效的 JSON 响应"
-        action = StepRunner._parse_llm_response(response)
-        assert action.action_type == ActionType.WAIT
-        assert "解析失败" in action.reason
+        with pytest.raises(ValueError, match="LLM 响应解析失败"):
+            StepRunner._parse_llm_response(response)
 
     def test_parse_llm_response_scroll(self):
         """验证解析 SCROLL 操作的 LLM 响应。"""

@@ -129,7 +129,7 @@ class UITreeExtractor:
                 clickable=elem.get("clickable", "false") == "true",
                 enabled=elem.get("enabled", "true") == "true",
                 focused=elem.get("focused", "false") == "true",
-                selected=elem.get("selected", "false") == "false",
+                selected=elem.get("selected", "false") == "true",
                 checkable=elem.get("checkable", "false") == "true",
                 focusable=elem.get("focusable", "false") == "true",
                 scrollable=elem.get("scrollable", "false") == "true",

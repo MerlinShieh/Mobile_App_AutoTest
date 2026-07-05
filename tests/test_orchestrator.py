@@ -122,13 +122,10 @@ class TestTaskOrchestrator:
         mocker.patch("mobile_automation.core.orchestrator.settings.loop_detection.max_same_actions", 3)
 
         action = Action(ActionType.CLICK, ActionParams(element_id="#1"))
-        # _same_action_count 需要累积到 max_same(3) 才返回 True
-        # 每次需要连续 3 次相同操作才 +1，所以共需 5 次
-        assert orchestrator._detect_loop(action) is False  # 第 1 次
-        assert orchestrator._detect_loop(action) is False  # 第 2 次
-        assert orchestrator._detect_loop(action) is False  # 第 3 次，_same_action_count=1
-        assert orchestrator._detect_loop(action) is False  # 第 4 次，_same_action_count=2
-        assert orchestrator._detect_loop(action) is True   # 第 5 次，_same_action_count=3
+        # 优化后：连续相同操作直接递增，第 3 次即触发 max_same(3)
+        assert orchestrator._detect_loop(action) is False  # 第 1 次，_same_action_count=1
+        assert orchestrator._detect_loop(action) is False  # 第 2 次，_same_action_count=2
+        assert orchestrator._detect_loop(action) is True   # 第 3 次，_same_action_count=3
 
     def test_detect_loop_different_actions(self, mocker):
         """验证不同操作不会触发死循环检测。"""
@@ -145,7 +142,8 @@ class TestTaskOrchestrator:
         orchestrator._detect_loop(Action(ActionType.CLICK, ActionParams(element_id="#1")))
         orchestrator._detect_loop(Action(ActionType.BACK, ActionParams()))
         orchestrator._detect_loop(Action(ActionType.CLICK, ActionParams(element_id="#2")))
-        assert orchestrator._same_action_count == 0
+        # 优化后：新操作重置为 1（第一次出现），不再是 0
+        assert orchestrator._same_action_count == 1
 
     def test_detect_loop_after_different_action(self, mocker):
         """验证不同操作后计数器重置。"""

@@ -282,7 +282,11 @@ class PopupHandler:
             是否成功点击了某个按钮。
         """
         try:
-            u2 = self._dm.get_u2()
+            try:
+                u2 = self._dm.get_u2()
+            except RuntimeError:
+                logger.warning("u2 未初始化，无法通过文本点击弹窗")
+                return False
             for text in texts:
                 if u2.click_by_text(text, exact=False):
                     logger.info("弹窗按钮点击成功: text=%s", text)
@@ -305,7 +309,11 @@ class PopupHandler:
             弹窗是否已关闭。
         """
         try:
-            u2 = self._dm.get_u2()
+            try:
+                u2 = self._dm.get_u2()
+            except RuntimeError:
+                logger.warning("u2 未初始化，无法关闭弹窗")
+                return False
             for kw in ["关闭", "close", "x", "dismiss"]:
                 if u2.click_by_text(kw, exact=False):
                     logger.info("弹窗关闭成功: keyword=%s", kw)

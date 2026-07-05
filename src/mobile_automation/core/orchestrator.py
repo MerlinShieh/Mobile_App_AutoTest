@@ -22,6 +22,8 @@ from typing import Optional
 
 from ..config import settings
 from ..llm.token_budget import TokenBudgetManager
+from datetime import datetime
+
 from ..logger import get_logger
 from ..models.action import Action
 from ..models.enums import ActionType, StepStatus, TaskStatus
@@ -207,8 +209,9 @@ class TaskOrchestrator:
         """
         max_duration: int = settings.execution.max_total_duration_seconds
         if context.is_timeout(max_duration_seconds=max_duration):
+            elapsed: int = int((datetime.now() - context.created_at).total_seconds())
             logger.warning("任务 %s 超时: 已执行 %ds，限制 %ds",
-                           context.task_id, max_duration, max_duration)
+                           context.task_id, elapsed, max_duration)
             return True
         return False
 
@@ -236,21 +239,20 @@ class TaskOrchestrator:
             action.params.element_id or "",
             action.params.direction or "",
         )
-        self._last_actions.append(action_key)
 
+        if self._last_actions and self._last_actions[-1] == action_key:
+            self._same_action_count += 1
+        else:
+            self._same_action_count = 1
+
+        self._last_actions.append(action_key)
         if len(self._last_actions) > settings.loop_detection.max_history_size:
             self._last_actions.pop(0)
 
         max_same: int = settings.loop_detection.max_same_actions
-        if len(self._last_actions) >= max_same:
-            recent: list[str] = self._last_actions[-max_same:]
-            if len(set(recent)) == 1:
-                self._same_action_count += 1
-                if self._same_action_count >= max_same:
-                    logger.warning("检测到死循环: 连续 %d 次相同操作 %s",
-                                   self._same_action_count, action_key)
-                    return True
-            else:
-                self._same_action_count = 0
+        if self._same_action_count >= max_same:
+            logger.warning("检测到死循环: 连续 %d 次相同操作 %s",
+                           self._same_action_count, action_key)
+            return True
 
         return False

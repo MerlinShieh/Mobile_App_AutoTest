@@ -27,6 +27,11 @@ from ..logger import get_logger
 from ..models.action import Action, ActionParams
 from ..models.enums import ActionType, StepStatus
 from ..models.perception import PerceptualResult, UITree
+import base64
+import io
+
+from PIL import Image
+
 from ..models.task import StepRecord
 from ..perception.page_diff import PageChangeDetector
 from ..perception.screen_capture import ScreenCapture
@@ -177,10 +182,13 @@ class StepRunner:
 
                 popup_result = self._popup_handler.detect(perceptual.ui_tree)
                 if popup_result and popup_result.detected:
-                    if self._popup_handler.handle(popup_result):
+                    handled = self._popup_handler.handle(popup_result)
+                    if handled:
                         logger.info("Step %d 弹窗已处理，重新感知并重试", step_index)
-                        record.status = StepStatus.RETRYING
-                        continue
+                    else:
+                        logger.warning("Step %d 弹窗处理未完成，重新感知", step_index)
+                    record.status = StepStatus.RETRYING
+                    continue
 
                 if preset_action is None:
                     action: Action = self._decide_action(perceptual, task_context, attempt + 1)
@@ -362,7 +370,7 @@ class StepRunner:
         node = perceptual.ui_tree.get_by_element_id(action.params.element_id)
         if node is None:
             logger.warning("element_id %s 在本地索引中未找到", action.params.element_id)
-            return
+            raise ValueError(f"element_id {action.params.element_id} 在本地索引中未找到")
 
         cx, cy = node.center()
         action.params.x = cx
@@ -435,7 +443,7 @@ class StepRunner:
         返回
         -------
         Action
-            解析出的操作指令。解析失败时返回 WAIT 操作的默认 Action。
+            解析出的操作指令。解析失败时抛出 ValueError。
         """
         try:
             # 提取 JSON 文本：优先从 markdown 代码块提取，否则用原始文本
@@ -467,11 +475,7 @@ class StepRunner:
             )
         except (json.JSONDecodeError, KeyError, ValueError) as exc:
             logger.error("LLM 响应解析失败: %s\n原始响应: %s", exc, response)
-            return Action(
-                action_type=ActionType.WAIT,
-                params=ActionParams(duration_ms=2000),
-                reason=f"LLM 响应解析失败: {exc}",
-            )
+            raise ValueError(f"LLM 响应解析失败: {exc}") from exc
 
     def _archive_screenshot(self, step_index: int, perceptual: PerceptualResult, after: bool) -> None:
         """
@@ -489,13 +493,8 @@ class StepRunner:
         if self._archiver is None:
             return
         try:
-            import base64, io
-            from PIL import Image
             raw = base64.b64decode(perceptual.screenshot_base64)
-            img = Image.open(io.BytesIO(raw))
-            buf = io.BytesIO()
-            img.save(buf, format="PNG")
-            self._archiver.save_screenshot(step_index, buf.getvalue(), after=after)
+            self._archiver.save_screenshot(step_index, raw, after=after)
         except Exception as exc:
             logger.warning("截图归档失败: %s", exc)
 

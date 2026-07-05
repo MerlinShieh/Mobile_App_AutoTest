@@ -9,6 +9,7 @@ LLM 所需的多模态消息格式。支持分层上下文管理：
 from typing import Optional
 
 from ..logger import get_logger
+from ..prompts.summary_prompt import SUMMARY_PROMPT
 from ..prompts.system_prompt import SYSTEM_PROMPT
 from .base import LLMMessage
 
@@ -117,7 +118,6 @@ class MessageBuilder:
         list[LLMMessage]
             用于摘要压缩的 LLM 消息列表。
         """
-        from ..prompts.summary_prompt import SUMMARY_PROMPT
 
         messages = [
             LLMMessage(role="system", content=SUMMARY_PROMPT),
