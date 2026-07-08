@@ -430,9 +430,14 @@ class StepRunner:
     @staticmethod
     def _parse_llm_response(response: str) -> Action:
         """
-        解析 LLM 返回的 JSON 格式响应为 Action 对象。
+        解析 LLM 返回的响应为 Action 对象。
 
-        支持 markdown 代码块包裹（```json ... ```）和裸 JSON 两种格式。
+        支持以下格式（按优先级）：
+        1. <answer>...</answer> 标签包裹的 JSON（CoT 格式）
+        2. markdown 代码块包裹的 JSON（```json ... ```）
+        3. 裸 JSON
+
+        同时提取 <think> 标签中的推理过程用于日志记录。
         自动修复 LLM 常见输出问题：字符串值内未转义的控制字符。
 
         参数
@@ -446,9 +451,19 @@ class StepRunner:
             解析出的操作指令。解析失败时抛出 ValueError。
         """
         try:
-            # 提取 JSON 文本：优先从 markdown 代码块提取，否则用原始文本
-            json_match = re.search(r"```(?:json)?\s*({.*?})\s*```", response, re.DOTALL)
-            json_text: str = json_match.group(1) if json_match else response
+            # 提取思维链推理（用于日志）
+            think_match = re.search(r"<think>(.*?)</think>", response, re.DOTALL)
+            if think_match:
+                reasoning = think_match.group(1).strip()
+                logger.debug("LLM 思维链推理: %s", reasoning[:200])
+
+            # 提取 JSON 文本：优先 <answer> 标签 > markdown 代码块 > 原始文本
+            answer_match = re.search(r"<answer>(.*?)</answer>", response, re.DOTALL)
+            if answer_match:
+                json_text = answer_match.group(1).strip()
+            else:
+                json_match = re.search(r"```(?:json)?\s*({.*?})\s*```", response, re.DOTALL)
+                json_text = json_match.group(1) if json_match else response
 
             # 首次尝试直接解析
             try:

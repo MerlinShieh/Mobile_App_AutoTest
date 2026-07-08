@@ -106,7 +106,7 @@ class DecisionPromptBuilder:
 
         user_content.append({
             "type": "text",
-            "text": f"## 当前页面元素\n{structured_summary}\n\n请输出下一步操作（JSON 格式）。",
+            "text": f"## 当前页面元素\n{structured_summary}\n\n请先推理（用 <think> 标签），再输出 JSON 操作（用 <answer> 标签）。",
         })
         messages.append(LLMMessage(role="user", content=user_content))
 
