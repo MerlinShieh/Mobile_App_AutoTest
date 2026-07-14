@@ -136,8 +136,13 @@ def build_app(args: argparse.Namespace) -> tuple[TaskOrchestrator, DeviceManager
     )
 
     provider_name = args.provider or settings.llm.provider
-    provider_cfg = settings.models.providers.get(provider_name)
-    if provider_cfg and not provider_cfg.api_key:
+    if provider_name not in settings.models.providers:
+        raise RuntimeError(
+            f"供应商 {provider_name} 未在配置中注册，请在 MODELS__PROVIDERS 中配置。"
+            f"当前已注册的供应商: {', '.join(settings.models.providers.keys())}"
+        )
+    provider_cfg = settings.models.providers[provider_name]
+    if not provider_cfg.api_key:
         raise RuntimeError(
             f"供应商 {provider_name} 的 API Key 未配置，请在 .env 中设置 "
             f"MODELS__PROVIDERS__{provider_name.upper()}__API_KEY"

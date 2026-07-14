@@ -100,7 +100,10 @@ class DeviceManager:
         """uiautomator2 控制器实例"""
         self._adb: Optional[ADBController] = None
         """ADB 控制器实例"""
-        self._screen_size: tuple[int, int] = (1080, 1920)
+        self._screen_size: tuple[int, int] = (
+            settings.device.default_screen_width,
+            settings.device.default_screen_height,
+        )
         """屏幕尺寸 (宽, 高)，连接成功后通过 update_screen_size 刷新"""
         logger.info("DeviceManager 单例初始化完成")
 

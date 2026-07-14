@@ -211,6 +211,8 @@ class DeviceSettings(BaseSettings):
     connect_retries: int = Field(default=3, description="设备连接失败后的最大重试次数")
     adb_path: str = Field(default="adb", description="ADB 可执行文件路径")
     u2_init_on_start: bool = Field(default=True, description="框架启动时是否自动初始化 uiautomator2 会话")
+    default_screen_width: int = Field(default=1080, description="无法获取设备屏幕时的默认宽度（像素）")
+    default_screen_height: int = Field(default=1920, description="无法获取设备屏幕时的默认高度（像素）")
 
 
 class ExecutionSettings(BaseSettings):

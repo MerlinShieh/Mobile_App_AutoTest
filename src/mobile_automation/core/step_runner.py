@@ -28,9 +28,6 @@ from ..models.action import Action, ActionParams
 from ..models.enums import ActionType, StepStatus
 from ..models.perception import PerceptualResult, UITree
 import base64
-import io
-
-from PIL import Image
 
 from ..models.task import StepRecord
 from ..perception.page_diff import PageChangeDetector
