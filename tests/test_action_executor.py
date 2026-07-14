@@ -143,6 +143,78 @@ class TestActionExecutor:
         result = executor.execute(action)
         assert result is True  # TERMINATE 现在在系统操作字典中有映射
 
+    def test_execute_system_lock_screen(self, mocker):
+        """验证 LOCK_SCREEN 通过 ADB 执行熄屏操作。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.LOCK_SCREEN, ActionParams())
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.lock_screen.assert_called_once()
+
+    def test_execute_system_open_notifications(self, mocker):
+        """验证 OPEN_NOTIFICATIONS 通过 ADB 展开通知栏。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.OPEN_NOTIFICATIONS, ActionParams())
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.open_notifications.assert_called_once()
+
+    def test_execute_system_rotate_screen(self, mocker):
+        """验证 ROTATE_SCREEN 通过 ADB 设置旋转方向。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.ROTATE_SCREEN, ActionParams(direction="landscape"))
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.set_rotation.assert_called_once_with(1)
+
+    def test_execute_system_volume_up(self, mocker):
+        """验证 VOLUME_UP 通过 ADB 调高音量。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.VOLUME_UP, ActionParams())
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.volume_up.assert_called_once()
+
+    def test_execute_system_volume_down(self, mocker):
+        """验证 VOLUME_DOWN 通过 ADB 调低音量。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.VOLUME_DOWN, ActionParams())
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.volume_down.assert_called_once()
+
+    def test_execute_system_rotate_screen_default_portrait(self, mocker):
+        """验证 ROTATE_SCREEN 无 direction 时默认竖屏。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.ROTATE_SCREEN, ActionParams())
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.set_rotation.assert_called_once_with(0)
+
     def test_executor_initialization_creates_sub_executors(self, mocker):
         """验证初始化时创建所有子执行器。"""
         mock_dm = mocker.MagicMock()

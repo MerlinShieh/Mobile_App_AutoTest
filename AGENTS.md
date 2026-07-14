@@ -77,7 +77,7 @@ mobile_automation/
 
 1. **LLM Prompt 语义理解**：模型只点击搜索框不输入文本 → 需要优化 decision_prompt
 2. **弹窗检测误报**：仍偶发误报导致死循环 → 需持续优化特征文本过滤
-3. **操作缺失**：缺少长按、拖拽、熄屏、旋转、音量调节等物理操作支持
+3. **操作缺失**：缺少拖拽操作支持（已新增熄屏 LOCK_SCREEN、通知栏 OPEN_NOTIFICATIONS、旋转 ROTATE_SCREEN、音量± VOLUME_UP/VOLUME_DOWN 共5个物理操作）
 
 ## 常用命令
 

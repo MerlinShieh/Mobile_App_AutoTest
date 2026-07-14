@@ -123,7 +123,11 @@ class ActionExecutor:
 
     def _execute_system_action(self, action: Action) -> bool:
         """
-        执行系统级操作（BACK / HOME / RECENT_APPS / OPEN_APP / CLOSE_APP / TERMINATE / VERIFY）。
+        执行系统级操作（BACK / HOME / RECENT_APPS / OPEN_APP / CLOSE_APP /
+        LOCK_SCREEN / OPEN_NOTIFICATIONS / ROTATE_SCREEN / VOLUME_UP / VOLUME_DOWN
+        / TERMINATE / VERIFY 等）。
+
+        部分操作（熄屏、通知栏、旋转、音量）通过 ADB 执行，其余通过 U2Controller。
 
         参数
         ----------
@@ -137,6 +141,7 @@ class ActionExecutor:
         """
         try:
             u2 = self._dm.get_u2()
+            adb = self._dm.get_adb()
             system_actions: dict[ActionType, callable] = {
                 ActionType.BACK: u2.press_back,
                 ActionType.HOME: u2.press_home,
@@ -144,6 +149,11 @@ class ActionExecutor:
                 ActionType.OPEN_APP: lambda: u2.app_start(action.params.package_name or ""),
                 ActionType.CLOSE_APP: lambda: u2.app_stop(action.params.package_name or ""),
                 ActionType.SCREENSHOT: lambda: self._capture_screenshot(),
+                ActionType.LOCK_SCREEN: adb.lock_screen,
+                ActionType.OPEN_NOTIFICATIONS: adb.open_notifications,
+                ActionType.ROTATE_SCREEN: lambda: adb.set_rotation(self._parse_rotation(action.params.direction)),
+                ActionType.VOLUME_UP: adb.volume_up,
+                ActionType.VOLUME_DOWN: adb.volume_down,
                 ActionType.TERMINATE: lambda: None,
                 ActionType.VERIFY: lambda: None,
             }
@@ -157,6 +167,29 @@ class ActionExecutor:
         except Exception as exc:
             logger.error("系统操作执行失败: type=%s, error=%s", action.action_type.value, exc)
             return False
+
+    @staticmethod
+    def _parse_rotation(direction: str | None) -> int:
+        """
+        将方向字符串解析为旋转值。
+
+        参数
+        ----------
+        direction : str | None
+            方向描述，可选 "portrait" / "landscape" / "reverse_portrait" / "reverse_landscape"。
+
+        返回
+        -------
+        int
+            旋转值（0-3），默认 0（竖屏）。
+        """
+        mapping: dict[str, int] = {
+            "portrait": 0,
+            "landscape": 1,
+            "reverse_portrait": 2,
+            "reverse_landscape": 3,
+        }
+        return mapping.get(direction, 0)
 
     @staticmethod
     def _apply_tuning(params: ActionParams) -> None:

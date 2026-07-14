@@ -36,7 +36,7 @@ class TestActionType:
 
     def test_total_members(self):
         """验证 ActionType 成员数量完整。"""
-        assert len(ActionType) == 17
+        assert len(ActionType) == 22
 
     def test_from_string_valid(self):
         """测试通过字符串值创建枚举。"""

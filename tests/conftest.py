@@ -62,6 +62,11 @@ def mock_device_manager(mocker):
     mock_adb = mocker.MagicMock()
     mock_adb.shell.return_value = ("1080x2400", "")
     mock_adb.screenshot.return_value = b"fake_adb_image_bytes"
+    mock_adb.lock_screen.return_value = None
+    mock_adb.open_notifications.return_value = None
+    mock_adb.set_rotation.return_value = None
+    mock_adb.volume_up.return_value = None
+    mock_adb.volume_down.return_value = None
     instance.get_adb.return_value = mock_adb
 
     return instance
@@ -99,6 +104,11 @@ def mock_adb(mocker):
     adb.screenshot.return_value = b"fake_adb_image_bytes"
     adb.reconnect.return_value = True
     adb.wait_for_device.return_value = True
+    adb.lock_screen.return_value = None
+    adb.open_notifications.return_value = None
+    adb.set_rotation.return_value = None
+    adb.volume_up.return_value = None
+    adb.volume_down.return_value = None
     return adb
 
 

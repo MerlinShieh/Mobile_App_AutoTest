@@ -154,6 +154,69 @@ class ADBController:
             logger.error("ADB server 重启失败: %s", exc)
             return False
 
+    def lock_screen(self) -> None:
+        """
+        锁定/熄屏设备。
+
+        通过 ADB 发送 KeyEvent 26（电源键）切换屏幕为锁定状态。
+        注意：此操作为 toggle 性质，如果屏幕已锁定可能会解锁。
+        建议在已知屏幕亮起状态下调用。
+        """
+        self.shell("input keyevent 26")
+        logger.info("设备已执行熄屏操作")
+
+    def open_notifications(self) -> None:
+        """
+        展开系统通知栏。
+
+        通过 ADB statusbar 命令展开通知面板。部分定制 ROM 可能
+        不支持此命令，此时可考虑通过滑动屏幕顶部下拉替代。
+        """
+        self.shell("cmd statusbar expand-notifications")
+        logger.info("通知栏已展开")
+
+    def set_rotation(self, rotation: int = 0) -> None:
+        """
+        设置屏幕旋转方向。
+
+        通过 ADB 修改 system user_rotation 设置项。
+        修改立即生效，但部分应用可能锁定方向不响应。
+
+        参数
+        ----------
+        rotation : int
+            目标旋转值：
+            - 0 = 竖屏（portrait）
+            - 1 = 横屏（landscape）
+            - 2 = 反向竖屏（reverse_portrait）
+            - 3 = 反向横屏（reverse_landscape）
+        """
+        if rotation not in (0, 1, 2, 3):
+            logger.warning("无效的旋转值: %d，使用 0（竖屏）代替", rotation)
+            rotation = 0
+        self.shell(f"settings put system user_rotation {rotation}")
+        logger.info("屏幕旋转已设置为: %d", rotation)
+
+    def volume_up(self) -> None:
+        """
+        调高媒体音量。
+
+        通过 ADB 发送 KeyEvent 24（音量+键）。
+        每次调用增加一级音量。
+        """
+        self.shell("input keyevent 24")
+        logger.info("音量 +1")
+
+    def volume_down(self) -> None:
+        """
+        调低媒体音量。
+
+        通过 ADB 发送 KeyEvent 25（音量-键）。
+        每次调用减少一级音量。
+        """
+        self.shell("input keyevent 25")
+        logger.info("音量 -1")
+
     def wait_for_device(self, timeout_ms: int = 30000) -> bool:
         """
         等待设备处于可用的在线状态。
