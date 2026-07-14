@@ -45,8 +45,13 @@ class PopupHandler:
     }
     """匹配弹窗按钮的特征文本集合。"""
 
-    OVERLAY_AREA_RATIO: float = 0.6
-    """覆盖层检测阈值：控件面积超过屏幕面积的此比例时视为覆盖层。"""
+    OVERLAY_AREA_RATIO: float = 0.85
+    """覆盖层检测阈值：控件面积超过屏幕面积的此比例时视为覆盖层。
+
+    注意：桌面的 Launcher 工作区或 Widget 容器面积可能超过 60%，
+    提高阈值至 85% 以减少误报。真实的系统级弹窗覆盖层通常覆盖
+    90%~100% 的屏幕面积。
+    """
 
     def __init__(self, device_manager: DeviceManager) -> None:
         """
@@ -183,9 +188,10 @@ class PopupHandler:
 
     def _find_overlay(self, tree: UITree) -> list[UINode]:
         """
-        检测面积超过屏幕 60% 的覆盖层节点。
+        检测面积超过阈值比例的覆盖层节点。
 
         覆盖层通常是半透明背景或全屏弹窗的容器。
+        额外过滤：不可点击且无文本的大面积节点被视为背景容器，跳过。
 
         参数
         ----------
@@ -202,6 +208,7 @@ class PopupHandler:
         return [
             n for n in tree.local_index.values()
             if n.area() > screen_area * self.OVERLAY_AREA_RATIO
+            and (n.clickable or n.text)
         ]
 
     def _find_by_feature_text(self, tree: UITree) -> list[UINode]:

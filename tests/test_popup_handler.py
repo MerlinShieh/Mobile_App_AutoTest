@@ -39,11 +39,11 @@ class TestPopupHandlerDetect:
         assert result.confidence == 0.85
 
     def test_detect_overlay(self, mocker):
-        """验证覆盖层检测命中。"""
+        """验证覆盖层检测命中（全屏可点击区域）。"""
         mock_dm = mocker.MagicMock()
         mock_dm.get_screen_size.return_value = (1080, 2400)
         root = UINode()
-        node = UINode(element_id="#1", bounds=(0, 0, 1080, 2400))
+        node = UINode(element_id="#1", bounds=(0, 0, 1080, 2400), clickable=True)
         tree = UITree(root=root, local_index={"#1": node})
         handler = PopupHandler(mock_dm)
         result = handler.detect(tree)
