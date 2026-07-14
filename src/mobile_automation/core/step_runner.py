@@ -357,6 +357,9 @@ class StepRunner:
         从 UI 树的本地索引中查找 element_id 对应的节点，
         将其中心坐标和 resource-id 填入 Action.params。
 
+        当 SCROLL/SWIPE 未指定 element_id 时，自动查找
+        屏幕上的可滚动容器并以其中心作为滑动起点。
+
         参数
         ----------
         action : Action
@@ -364,20 +367,62 @@ class StepRunner:
         perceptual : PerceptualResult
             感知结果，包含 UI 树。
         """
-        if not action.params.element_id or not perceptual.ui_tree:
+        if not perceptual.ui_tree:
             return
 
-        node = perceptual.ui_tree.get_by_element_id(action.params.element_id)
-        if node is None:
-            logger.warning("element_id %s 在本地索引中未找到", action.params.element_id)
-            raise ValueError(f"element_id {action.params.element_id} 在本地索引中未找到")
+        # ---- 1. element_id 已指定：正常解析 ----
+        if action.params.element_id:
+            node = perceptual.ui_tree.get_by_element_id(action.params.element_id)
+            if node is None:
+                logger.warning("element_id %s 在本地索引中未找到", action.params.element_id)
+                raise ValueError(f"element_id {action.params.element_id} 在本地索引中未找到")
+            cx, cy = node.center()
+            action.params.x = cx
+            action.params.y = cy
+            action.params.ui_element = node.resource_id or node.text
+            logger.debug("element_id %s 解析为坐标 (%d, %d), ui_element=%s",
+                         action.params.element_id, cx, cy, action.params.ui_element)
+            return
 
-        cx, cy = node.center()
+        # ---- 2. SCROLL/SWIPE 未指定 element_id：自动寻找可滚动容器 ----
+        if action.action_type in (ActionType.SCROLL, ActionType.SWIPE):
+            self._resolve_scrollable_container(action, perceptual)
+
+    def _resolve_scrollable_container(self, action: Action, perceptual: PerceptualResult) -> None:
+        """自动找到屏幕上的可滚动容器并设置为滑动/滚动的起点。"""
+        scrollable_nodes = [
+            n for n in perceptual.ui_tree.local_index.values()
+            if n.scrollable and n.area() > 0
+        ]
+        if not scrollable_nodes:
+            return
+
+        screen_w, screen_h = self._dm.get_screen_size()
+        screen_area = screen_w * screen_h
+
+        candidates = [
+            n for n in scrollable_nodes
+            if n.area() < screen_area * 0.95 and n.area() > screen_area * 0.02
+        ]
+        if not candidates:
+            return
+
+        # 横屏模式优先选择左侧容器（菜单通常在左侧）
+        if screen_w > screen_h:
+            left_nodes = [
+                n for n in candidates
+                if (n.bounds[0] + n.bounds[2]) // 2 < screen_w * 0.5
+            ]
+            target = max(left_nodes, key=lambda n: n.area()) if left_nodes else max(candidates, key=lambda n: n.area())
+        else:
+            target = max(candidates, key=lambda n: n.area())
+
+        cx, cy = target.center()
         action.params.x = cx
         action.params.y = cy
-        action.params.ui_element = node.resource_id or node.text
-        logger.debug("element_id %s 解析为坐标 (%d, %d), ui_element=%s",
-                     action.params.element_id, cx, cy, action.params.ui_element)
+        action.params.ui_element = target.resource_id or target.text or ""
+        logger.info("自动定位可滚动容器 %s (%s) 作为滑动起点 (%d, %d)",
+                    target.element_id, action.params.ui_element, cx, cy)
 
     @staticmethod
     def _sanitize_json_strings(text: str) -> str:

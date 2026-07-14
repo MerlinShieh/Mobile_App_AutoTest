@@ -81,10 +81,13 @@ class PageChangeDetector:
         structural_score, changed_nodes = self._structural_diff(current_tree, self._prev_tree)
         visual_score = self._visual_diff(current_screenshot, self._prev_screenshot)
 
+        # 视觉变化极大但结构变化极小 → 滚动场景（预加载列表结构不变，画面滚动）
+        is_scroll = visual_score > 0.9 and structural_score < 0.1
+
         combined = structural_score * self.STRUCTURAL_WEIGHT + visual_score * self.VISUAL_WEIGHT
         # 结构差异必须达到阈值的一半以上，防止时钟/通知等微小变化被误判为页面变化
         structural_min = self.CHANGE_THRESHOLD * 0.5
-        has_changed = combined > self.CHANGE_THRESHOLD and structural_score > structural_min
+        has_changed = is_scroll or (combined > self.CHANGE_THRESHOLD and structural_score > structural_min)
         verdict = (
             f"结构差异({structural_score:.2f}) 视觉差异({visual_score:.2f}) 综合({combined:.2f})"
         )

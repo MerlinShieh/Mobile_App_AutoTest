@@ -80,7 +80,8 @@ class SwipeExecutor:
         """
         执行方向滑动操作。
 
-        根据 direction 从屏幕中心沿指定方向滑动一定的距离比例。
+        优先使用 Action.params 中的 (x, y) 作为起点（由 LLM 指定的 element_id
+        解析而来），无指定时从屏幕中心滑动。
 
         参数
         ----------
@@ -101,7 +102,11 @@ class SwipeExecutor:
             vector = self.DIRECTION_VECTORS["up"]
 
         screen_w, screen_h = self._dm.get_screen_size()
-        cx, cy = screen_w // 2, screen_h // 2
+
+        if action.params.x is not None and action.params.y is not None:
+            cx, cy = action.params.x, action.params.y
+        else:
+            cx, cy = screen_w // 2, screen_h // 2
 
         dx: int = int(vector[0] * screen_w * distance_ratio)
         dy: int = int(vector[1] * screen_h * distance_ratio)
@@ -153,9 +158,12 @@ class SwipeExecutor:
         """
         执行滚动操作。
 
-        从屏幕中心沿指定方向滑动一定距离，方向语义：
-          - "up"（向上滚动）= 手指从屏幕中心向上推 → 内容向上移 → 露出列表底部的条目
-          - "down"（向下滚动）= 手指从屏幕中心向下拉 → 内容向下移 → 露出列表顶部的条目
+        优先使用 Action.params 中的 (x, y) 作为起点（由 LLM 指定的 element_id
+        解析而来），无指定时从屏幕中心滚动。
+
+        方向语义：
+           - "up"（向上滚动）= 手指从屏幕中心向上推 → 内容向上移 → 露出列表底部的条目
+           - "down"（向下滚动）= 手指从屏幕中心向下拉 → 内容向下移 → 露出列表顶部的条目
 
         参数
         ----------
@@ -176,7 +184,11 @@ class SwipeExecutor:
             vector = self.DIRECTION_VECTORS["up"]
 
         screen_w, screen_h = self._dm.get_screen_size()
-        cx, cy = screen_w // 2, screen_h // 2
+
+        if action.params.x is not None and action.params.y is not None:
+            cx, cy = action.params.x, action.params.y
+        else:
+            cx, cy = screen_w // 2, screen_h // 2
 
         dx: int = int(vector[0] * screen_w * distance_ratio)
         dy: int = int(vector[1] * screen_h * distance_ratio)
