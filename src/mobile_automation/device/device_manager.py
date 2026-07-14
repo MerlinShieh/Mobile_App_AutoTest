@@ -52,7 +52,7 @@ class DeviceInfo:
 
 class DeviceManager:
     """
-    设备管理器（单例模式）。
+    设备管理器（线程安全单例模式）。
 
     管理设备连接生命周期，支持：
     - 列出已连接的设备列表
@@ -61,6 +61,9 @@ class DeviceManager:
     - 健康检查与自动重连（含指数退避）
     - 获取 uiautomator2 / ADB 控制器实例
     - 缓存屏幕尺寸信息
+
+    所有修改实例状态的方法均受 ``threading.RLock`` 保护，
+    支持同一线程内的可重入调用（如 health_check → connect）。
 
     使用示例
     --------
@@ -75,12 +78,12 @@ class DeviceManager:
 
     _instance: Optional["DeviceManager"] = None
     """单例全局实例"""
-    _lock: "threading.Lock" = threading.Lock()
+    _singleton_lock: "threading.Lock" = threading.Lock()
     """单例创建线程锁"""
 
     def __new__(cls) -> "DeviceManager":
         if cls._instance is None:
-            with cls._lock:
+            with cls._singleton_lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
@@ -90,6 +93,7 @@ class DeviceManager:
         if self._initialized:
             return
         self._initialized: bool = True
+        self._instance_lock: threading.RLock = threading.RLock()
         self._serial: str = ""
         """当前连接的设备序列号"""
         self._u2: Optional[U2Controller] = None
@@ -168,41 +172,42 @@ class DeviceManager:
         RuntimeError
             ADB 控制器初始化失败时抛出。
         """
-        if not serial:
-            devices = self.list_devices()
-            online = [d for d in devices if d.online]
-            if not online:
-                raise DeviceConnectionError("未发现在线设备")
-            serial = online[0].serial
-            logger.info("未指定设备，自动选择: %s", serial)
+        with self._instance_lock:
+            if not serial:
+                devices = self.list_devices()
+                online = [d for d in devices if d.online]
+                if not online:
+                    raise DeviceConnectionError("未发现在线设备")
+                serial = online[0].serial
+                logger.info("未指定设备，自动选择: %s", serial)
 
-        logger.info("正在连接设备: %s", serial)
+            logger.info("正在连接设备: %s", serial)
 
-        # 优先初始化 uiautomator2
-        u2_success = False
-        try:
-            self._u2 = U2Controller(serial)
-            u2_success = True
-            logger.info("uiautomator2 连接成功: %s", serial)
-        except Exception as exc:
-            self._u2 = None
-            logger.warning("uiautomator2 连接失败，启用 ADB fallback: %s", exc)
+            # 优先初始化 uiautomator2
+            u2_success = False
+            try:
+                self._u2 = U2Controller(serial)
+                u2_success = True
+                logger.info("uiautomator2 连接成功: %s", serial)
+            except Exception as exc:
+                self._u2 = None
+                logger.warning("uiautomator2 连接失败，启用 ADB fallback: %s", exc)
 
-        # 始终初始化 ADB 控制器
-        try:
-            self._adb = ADBController(serial, max_retries=settings.device.connect_retries)
-        except Exception as exc:
-            logger.error("ADB 控制器初始化失败: %s", exc)
-            raise RuntimeError(f"ADB 控制器初始化失败: {exc}") from exc
+            # 始终初始化 ADB 控制器
+            try:
+                self._adb = ADBController(serial, max_retries=settings.device.connect_retries)
+            except Exception as exc:
+                logger.error("ADB 控制器初始化失败: %s", exc)
+                raise RuntimeError(f"ADB 控制器初始化失败: {exc}") from exc
 
-        self._serial = serial
-        self._update_screen_size()
+            self._serial = serial
+            self._update_screen_size()
 
-        if u2_success:
-            logger.info("设备连接完成（u2 + ADB）: %s", serial)
-        else:
-            logger.warning("设备连接完成（仅 ADB fallback）: %s", serial)
-        return True
+            if u2_success:
+                logger.info("设备连接完成（u2 + ADB）: %s", serial)
+            else:
+                logger.warning("设备连接完成（仅 ADB fallback）: %s", serial)
+            return True
 
     def disconnect(self) -> None:
         """
@@ -210,11 +215,12 @@ class DeviceManager:
 
         调用后 get_u2() 和 get_adb() 将抛出异常，直到重新 connect()。
         """
-        serial = self._serial
-        self._u2 = None
-        self._adb = None
-        self._serial = ""
-        logger.info("设备断开连接: %s", serial)
+        with self._instance_lock:
+            serial = self._serial
+            self._u2 = None
+            self._adb = None
+            self._serial = ""
+            logger.info("设备断开连接: %s", serial)
 
     def health_check(self) -> bool:
         """
@@ -228,37 +234,38 @@ class DeviceManager:
         bool
             True 表示设备连接正常。
         """
-        if not self._serial:
-            logger.warning("健康检查失败：未连接任何设备")
+        with self._instance_lock:
+            if not self._serial:
+                logger.warning("健康检查失败：未连接任何设备")
+                return False
+
+            # u2 会话检查
+            if self._u2 is not None:
+                try:
+                    if self._u2.health_check():
+                        logger.debug("设备健康检查通过: %s", self._serial)
+                        return True
+                except Exception as exc:
+                    logger.warning("uiautomator2 健康检查异常: %s", exc)
+                self._u2 = None
+                logger.info("uiautomator2 会话已失效，准备重连: %s", self._serial)
+
+            # 自动重连
+            max_retries = settings.device.connect_retries
+            for attempt in range(1, max_retries + 1):
+                try:
+                    logger.info("重连尝试 %d/%d: %s", attempt, max_retries, self._serial)
+                    self.connect(self._serial)
+                    if self._u2 is not None:
+                        logger.info("重连成功: %s", self._serial)
+                        return True
+                except Exception as exc:
+                    logger.warning("重连尝试 %d 失败: %s", attempt, exc)
+                if attempt < max_retries:
+                    time.sleep(2 * attempt)
+
+            logger.error("设备重连失败: %s", self._serial)
             return False
-
-        # u2 会话检查
-        if self._u2 is not None:
-            try:
-                if self._u2.health_check():
-                    logger.debug("设备健康检查通过: %s", self._serial)
-                    return True
-            except Exception as exc:
-                logger.warning("uiautomator2 健康检查异常: %s", exc)
-            self._u2 = None
-            logger.info("uiautomator2 会话已失效，准备重连: %s", self._serial)
-
-        # 自动重连
-        max_retries = settings.device.connect_retries
-        for attempt in range(1, max_retries + 1):
-            try:
-                logger.info("重连尝试 %d/%d: %s", attempt, max_retries, self._serial)
-                self.connect(self._serial)
-                if self._u2 is not None:
-                    logger.info("重连成功: %s", self._serial)
-                    return True
-            except Exception as exc:
-                logger.warning("重连尝试 %d 失败: %s", attempt, exc)
-            if attempt < max_retries:
-                time.sleep(2 * attempt)
-
-        logger.error("设备重连失败: %s", self._serial)
-        return False
 
     def get_u2(self) -> U2Controller:
         """
@@ -274,9 +281,10 @@ class DeviceManager:
         RuntimeError
             当前未连接或 uiautomator2 未初始化时抛出。
         """
-        if self._u2 is None:
-            raise RuntimeError("uiautomator2 未连接，请先调用 connect()")
-        return self._u2
+        with self._instance_lock:
+            if self._u2 is None:
+                raise RuntimeError("uiautomator2 未连接，请先调用 connect()")
+            return self._u2
 
     def get_adb(self) -> ADBController:
         """
@@ -292,9 +300,10 @@ class DeviceManager:
         RuntimeError
             当前未连接时抛出。
         """
-        if self._adb is None:
-            raise RuntimeError("ADB 未连接，请先调用 connect()")
-        return self._adb
+        with self._instance_lock:
+            if self._adb is None:
+                raise RuntimeError("ADB 未连接，请先调用 connect()")
+            return self._adb
 
     def get_screen_size(self) -> tuple[int, int]:
         """
@@ -305,7 +314,8 @@ class DeviceManager:
         tuple[int, int]
             (屏幕宽度, 屏幕高度)，单位像素。
         """
-        return self._screen_size
+        with self._instance_lock:
+            return self._screen_size
 
     def get_serial(self) -> str:
         """
@@ -316,7 +326,8 @@ class DeviceManager:
         str
             设备序列号，未连接时返回空字符串。
         """
-        return self._serial
+        with self._instance_lock:
+            return self._serial
 
     def _update_screen_size(self) -> None:
         """
