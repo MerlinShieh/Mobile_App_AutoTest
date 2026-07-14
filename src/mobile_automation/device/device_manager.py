@@ -8,6 +8,7 @@ uiautomator2 优先 + ADB fallback 的双通道连接策略。
 
 import re
 import subprocess
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -74,11 +75,15 @@ class DeviceManager:
 
     _instance: Optional["DeviceManager"] = None
     """单例全局实例"""
+    _lock: "threading.Lock" = threading.Lock()
+    """单例创建线程锁"""
 
     def __new__(cls) -> "DeviceManager":
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
         return cls._instance
 
     def __init__(self) -> None:
@@ -91,8 +96,8 @@ class DeviceManager:
         """uiautomator2 控制器实例"""
         self._adb: Optional[ADBController] = None
         """ADB 控制器实例"""
-        self._screen_size: tuple[int, int] = (1080, 2400)
-        """屏幕尺寸 (宽, 高)，默认可通过 update_screen_size 刷新"""
+        self._screen_size: tuple[int, int] = (1080, 1920)
+        """屏幕尺寸 (宽, 高)，连接成功后通过 update_screen_size 刷新"""
         logger.info("DeviceManager 单例初始化完成")
 
     def list_devices(self) -> list[DeviceInfo]:
