@@ -140,13 +140,10 @@ class StepRunner:
         执行一步完整的操作闭环。
 
         执行流程：
-          1. 感知当前页面状态（截图 + UI 树）。
-          2. 弹窗检测：有弹窗则自动处理后重试。
-          3. LLM 决策（若无预置 Action）。
-          4. 解析 element_id 为实际坐标。
-          5. 执行 Action。
-          6. 二次感知并验证页面变化（screenshot / wait 操作跳过此步）。
-          7. 记录结果到 StepRecord。
+          1. 感知当前页面状态 + 弹窗处理。
+          2. LLM 决策（若无预置 Action）。
+          3. 解析 element_id 为实际坐标 + 执行 Action。
+          4. 二次感知并验证页面变化 / 归档结果。
 
         参数
         ----------
@@ -174,86 +171,25 @@ class StepRunner:
                 logger.info("Step %d 开始执行 (attempt %d/%d)",
                             step_index, attempt + 1, settings.execution.max_retries_per_step)
 
-                perceptual: PerceptualResult = self._perception.capture_with_ui_tree()
-
-                self._archive_screenshot(step_index, perceptual, after=False)
-                if perceptual.ui_tree:
-                    self._archive_xml_and_summary(step_index, perceptual.ui_tree)
-
-                popup_result = self._popup_handler.detect(perceptual.ui_tree)
-                if popup_result and popup_result.detected:
-                    handled = self._popup_handler.handle(popup_result)
-                    if handled:
-                        logger.info("Step %d 弹窗已处理，重新感知并重试", step_index)
-                    else:
-                        logger.warning("Step %d 弹窗处理未完成，重新感知", step_index)
-                    record.status = StepStatus.RETRYING
+                # 1. 感知 + 弹窗处理
+                perceptual = self._perceive_with_popup_handling(step_index, record)
+                if record.status == StepStatus.RETRYING:
                     continue
 
+                # 2. LLM 决策（或使用预置 Action）
                 if preset_action is None:
                     action: Action = self._decide_action(perceptual, task_context, attempt + 1)
                     record.action = action
                     logger.info("Step %d LLM 决策完成: type=%s, element_id=%s",
                                 step_index, action.action_type.value, action.params.element_id)
 
+                # 3. 解析坐标 + 执行
                 self._resolve_action_coordinates(record.action, perceptual)
                 self._executor.execute(record.action)
 
-                if record.action.action_type in (
-                    ActionType.SWIPE, ActionType.SWIPE_POINT, ActionType.SCROLL,
-                ):
-                    time.sleep(settings.execution.page_stable_poll_ms / 1000.0)
-
-                self._dm.health_check()
-
-                # screenshot、wait、terminate 和 verify 操作不改变页面，跳过验证直接成功
-                if record.action.action_type in (
-                    ActionType.SCREENSHOT, ActionType.WAIT, ActionType.TERMINATE, ActionType.VERIFY,
-                ):
-                    record.page_summary = (
-                        perceptual.ui_tree.structured_summary
-                        if perceptual.ui_tree else ""
-                    )
-                    record.status = StepStatus.SUCCESS
-                    logger.info("Step %d 执行成功 (动作=%s 无需验证页面变化)",
-                                step_index, record.action.action_type.value)
-                    self._archive_screenshot(step_index, perceptual, after=True)
-                    self._register_step_archive(
-                        step_index, perceptual, record.action, record.status.value,
-                    )
+                # 4. 验证页面变化 + 归档
+                if self._verify_and_finalize(step_index, perceptual, record):
                     break
-
-                new_perceptual: PerceptualResult = self._perception.capture_with_ui_tree()
-                self._archive_screenshot(step_index, new_perceptual, after=True)
-                change_result = self._page_diff.compare(
-                    new_perceptual.ui_tree, new_perceptual.screenshot_base64,
-                )
-
-                if change_result.has_changed:
-                    record.page_summary = (
-                        new_perceptual.ui_tree.structured_summary
-                        if new_perceptual.ui_tree else ""
-                    )
-                    record.status = StepStatus.SUCCESS
-                    logger.info("Step %d 执行成功", step_index)
-                    self._register_step_archive(
-                        step_index, perceptual, record.action, record.status.value,
-                    )
-                    break
-                else:
-                    record.retry_count += 1
-                    if record.retry_count >= settings.execution.max_retries_per_step:
-                        record.status = StepStatus.FAILED
-                        record.error_message = "操作后页面未发生变化"
-                        logger.warning("Step %d 失败: 操作后页面未变化", step_index)
-                        self._register_step_archive(
-                            step_index, perceptual, record.action, record.status.value,
-                            error=record.error_message,
-                        )
-                        break
-                    record.status = StepStatus.RETRYING
-                    logger.info("Step %d 页面未变化，重试 (attempt %d/%d)",
-                                step_index, record.retry_count, settings.execution.max_retries_per_step)
 
             except Exception as exc:
                 record.retry_count += 1
@@ -271,6 +207,127 @@ class StepRunner:
                     record.status = StepStatus.RETRYING
 
         return record
+
+    def _perceive_with_popup_handling(
+        self,
+        step_index: int,
+        record: StepRecord,
+    ) -> PerceptualResult:
+        """
+        感知当前页面并处理弹窗。
+
+        1. 调用 ScreenCapture 获取截图和 UI 树。
+        2. 归档操作前的截图和 XML。
+        3. 检测弹窗，有则处理后设置 record.status = RETRYING。
+
+        返回
+        -------
+        PerceptualResult
+            感知结果。
+        """
+        perceptual: PerceptualResult = self._perception.capture_with_ui_tree()
+
+        self._archive_screenshot(step_index, perceptual, after=False)
+        if perceptual.ui_tree:
+            self._archive_xml_and_summary(step_index, perceptual.ui_tree)
+
+        popup_result = self._popup_handler.detect(perceptual.ui_tree)
+        if popup_result and popup_result.detected:
+            handled = self._popup_handler.handle(popup_result)
+            if handled:
+                logger.info("Step %d 弹窗已处理，重新感知并重试", step_index)
+            else:
+                logger.warning("Step %d 弹窗处理未完成，重新感知", step_index)
+            record.status = StepStatus.RETRYING
+
+        return perceptual
+
+    def _verify_and_finalize(
+        self,
+        step_index: int,
+        perceptual: PerceptualResult,
+        record: StepRecord,
+    ) -> bool:
+        """
+        验证操作执行后的页面变化并归档结果。
+
+        对滑动操作先等待页面稳定，然后：
+        - 非变更操作（screenshot / wait / terminate / verify）：直接标记成功。
+        - 其他操作：二次感知并与操作前对比，判断页面是否变化。
+        无论成功或失败均会执行归档。
+
+        参数
+        ----------
+        step_index : int
+            步骤序号。
+        perceptual : PerceptualResult
+            操作前的感知结果。
+        record : StepRecord
+            当前步骤记录，会被修改。
+
+        返回
+        -------
+        bool
+            True 表示步骤已完成（应退出重试循环），False 表示需重试。
+        """
+        if record.action.action_type in (
+            ActionType.SWIPE, ActionType.SWIPE_POINT, ActionType.SCROLL,
+        ):
+            time.sleep(settings.execution.page_stable_poll_ms / 1000.0)
+
+        self._dm.health_check()
+
+        # 非变更操作：跳过验证，直接成功
+        if record.action.action_type in (
+            ActionType.SCREENSHOT, ActionType.WAIT, ActionType.TERMINATE, ActionType.VERIFY,
+        ):
+            record.page_summary = (
+                perceptual.ui_tree.structured_summary
+                if perceptual.ui_tree else ""
+            )
+            record.status = StepStatus.SUCCESS
+            logger.info("Step %d 执行成功 (动作=%s 无需验证页面变化)",
+                        step_index, record.action.action_type.value)
+            self._archive_screenshot(step_index, perceptual, after=True)
+            self._register_step_archive(
+                step_index, perceptual, record.action, record.status.value,
+            )
+            return True
+
+        # 二次感知 + 页面变化对比
+        new_perceptual: PerceptualResult = self._perception.capture_with_ui_tree()
+        self._archive_screenshot(step_index, new_perceptual, after=True)
+        change_result = self._page_diff.compare(
+            new_perceptual.ui_tree, new_perceptual.screenshot_base64,
+        )
+
+        if change_result.has_changed:
+            record.page_summary = (
+                new_perceptual.ui_tree.structured_summary
+                if new_perceptual.ui_tree else ""
+            )
+            record.status = StepStatus.SUCCESS
+            logger.info("Step %d 执行成功", step_index)
+            self._register_step_archive(
+                step_index, perceptual, record.action, record.status.value,
+            )
+            return True
+
+        record.retry_count += 1
+        if record.retry_count >= settings.execution.max_retries_per_step:
+            record.status = StepStatus.FAILED
+            record.error_message = "操作后页面未发生变化"
+            logger.warning("Step %d 失败: 操作后页面未变化", step_index)
+            self._register_step_archive(
+                step_index, perceptual, record.action, record.status.value,
+                error=record.error_message,
+            )
+            return True
+
+        record.status = StepStatus.RETRYING
+        logger.info("Step %d 页面未变化，重试 (attempt %d/%d)",
+                    step_index, record.retry_count, settings.execution.max_retries_per_step)
+        return False
 
     def _decide_action(self, perceptual: PerceptualResult, task_context: TaskContext, attempt: int = 1) -> Action:
         """
