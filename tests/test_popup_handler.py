@@ -52,12 +52,13 @@ class TestPopupHandlerDetect:
         assert result.confidence == 0.7
 
     def test_detect_feature_text(self, mocker):
-        """验证特征文本检测命中。"""
+        """验证特征文本检测命中（需 ≥2 种不同文本，模拟真实弹窗的"确定"+"取消"）。"""
         mock_dm = mocker.MagicMock()
         mock_dm.get_screen_size.return_value = (1080, 2400)
         root = UINode()
-        node = UINode(element_id="#1", text="allow", bounds=(10, 10, 100, 50))
-        tree = UITree(root=root, local_index={"#1": node})
+        node1 = UINode(element_id="#1", text="allow", bounds=(10, 10, 100, 50))
+        node2 = UINode(element_id="#2", text="deny", bounds=(10, 60, 100, 100))
+        tree = UITree(root=root, local_index={"#1": node1, "#2": node2})
         handler = PopupHandler(mock_dm)
         result = handler.detect(tree)
         assert result is not None

@@ -216,6 +216,8 @@ class PopupHandler:
         通过特征文本匹配查找弹窗按钮节点。
 
         检查节点的 text 是否在弹窗特征文本集合中。
+        要求至少匹配到 2 个不同的特征文本（如"确定"+"取消"同时出现），
+        防止单个"确定"/"取消"按钮在设置表单等正常页面中被误判为弹窗。
 
         参数
         ----------
@@ -225,12 +227,16 @@ class PopupHandler:
         返回
         -------
         list[UINode]
-            匹配的按钮节点列表。
+            匹配的按钮节点列表，不足 2 种不同文本时返回空列表。
         """
-        return [
+        matched = [
             n for n in tree.local_index.values()
             if n.text and n.text.strip().lower() in self.FEATURE_TEXTS
         ]
+        unique_texts = set(n.text.strip().lower() for n in matched)
+        if len(unique_texts) >= 2:
+            return matched
+        return []
 
     def _classify_by_nodes(self, nodes: list[UINode]) -> PopupType:
         """
