@@ -2,12 +2,176 @@
 
 测试 pydantic-settings 配置的正确加载、环境变量覆盖
 和 get_llm_config 辅助函数的输出。
+
+涵盖：
+- Settings 全局配置的默认值和嵌套访问
+- ModelSettings/ProviderConfig/ModelEntry 新增配置类
+- 模型注册表查询方法的正确性
 """
 
 import pytest
 from pydantic import ValidationError
 
-from mobile_automation.config import Settings, get_llm_config, settings
+from mobile_automation.config import (
+    ModelEntry,
+    ModelSettings,
+    ProviderConfig,
+    Settings,
+    get_llm_config,
+    settings,
+)
+
+
+class TestProviderConfig:
+    """测试 ProviderConfig 数据类。"""
+
+    def test_default_values(self):
+        """验证默认值。"""
+        cfg = ProviderConfig()
+        assert cfg.api_key == ""
+        assert cfg.base_url == ""
+        assert cfg.timeout == 60
+
+    def test_custom_values(self):
+        """验证自定义值。"""
+        cfg = ProviderConfig(api_key="sk-test", base_url="https://test.com/v1", timeout=30)
+        assert cfg.api_key == "sk-test"
+        assert cfg.base_url == "https://test.com/v1"
+        assert cfg.timeout == 30
+
+
+class TestModelEntry:
+    """测试 ModelEntry 数据类及能力属性。"""
+
+    def test_default_values(self):
+        """验证默认值。"""
+        entry = ModelEntry()
+        assert entry.provider == ""
+        assert entry.model_name == ""
+        assert entry.model_type == "multimodal"
+        assert entry.context_window == 32000
+        assert entry.max_tokens == 4096
+        assert entry.temperature == 0.1
+
+    def test_is_multimodal_true(self):
+        """验证 model_type=multimodal 时 is_multimodal 返回 True。"""
+        entry = ModelEntry(model_type="multimodal")
+        assert entry.is_multimodal is True
+        assert entry.is_text_only is False
+
+    def test_is_text_only_true(self):
+        """验证 model_type=text 时 is_text_only 返回 True。"""
+        entry = ModelEntry(model_type="text")
+        assert entry.is_text_only is True
+        assert entry.is_multimodal is False
+
+    def test_custom_model_entry(self):
+        """验证完整的 ModelEntry 自定义。"""
+        entry = ModelEntry(
+            provider="qwen",
+            model_name="qwen3.6-flash",
+            model_type="multimodal",
+            context_window=64000,
+            max_tokens=8192,
+            temperature=0.2,
+        )
+        assert entry.provider == "qwen"
+        assert entry.model_name == "qwen3.6-flash"
+        assert entry.context_window == 64000
+        assert entry.max_tokens == 8192
+        assert entry.temperature == 0.2
+        assert entry.is_multimodal is True
+
+
+class TestModelSettings:
+    """测试 ModelSettings 多模型配置管理。"""
+
+    def test_default_providers_count(self):
+        """验证默认供应商数量（qwen/zhipu/deepseek/longcat）。"""
+        ms = ModelSettings()
+        assert len(ms.providers) == 4
+        assert "qwen" in ms.providers
+        assert "zhipu" in ms.providers
+        assert "deepseek" in ms.providers
+        assert "longcat" in ms.providers
+
+    def test_default_models_count(self):
+        """验证默认模型注册表数量（6 个模型条目）。"""
+        ms = ModelSettings()
+        assert len(ms.models) == 6
+        assert "qwen-flash" in ms.models
+        assert "qwen-plus" in ms.models
+        assert "zhipu-flash" in ms.models
+        assert "zhipu-flashx" in ms.models
+        assert "deepseek-flash" in ms.models
+        assert "longcat-flash" in ms.models
+
+    def test_default_multimodal_and_text(self):
+        """验证默认多模态/纯文本模型 key 正确。"""
+        ms = ModelSettings()
+        assert ms.default_multimodal == "qwen-flash"
+        assert ms.default_text == "deepseek-flash"
+
+    def test_get_model_found(self):
+        """验证 get_model 返回存在的模型。"""
+        ms = ModelSettings()
+        entry = ms.get_model("qwen-flash")
+        assert entry is not None
+        assert entry.model_name == "qwen3.6-flash"
+        assert entry.is_multimodal is True
+
+    def test_get_model_not_found(self):
+        """验证 get_model 返回 None 当模型不存在。"""
+        ms = ModelSettings()
+        assert ms.get_model("nonexistent-model") is None
+
+    def test_get_provider_config_found(self):
+        """验证 get_provider_config 返回存在供应商的配置。"""
+        ms = ModelSettings()
+        cfg = ms.get_provider_config("qwen")
+        assert cfg is not None
+        assert cfg.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+    def test_get_provider_config_not_found(self):
+        """验证 get_provider_config 返回 None 当供应商不存在。"""
+        ms = ModelSettings()
+        assert ms.get_provider_config("unknown-provider") is None
+
+    def test_resolve_api_key_from_provider(self):
+        """验证 resolve_api_key 从供应商配置读取 API Key。"""
+        ms = ModelSettings()
+        ms.providers["qwen"].api_key = "sk-qwen-test"
+        assert ms.resolve_api_key("qwen-flash") == "sk-qwen-test"
+
+    def test_resolve_api_key_empty_when_not_configured(self):
+        """验证 resolve_api_key 返回空字符串当 API Key 未配置。"""
+        ms = ModelSettings()
+        assert ms.resolve_api_key("qwen-flash") == ""
+
+    def test_resolve_api_key_empty_for_nonexistent_model(self):
+        """验证 resolve_api_key 返回空字符串当模型不存在。"""
+        ms = ModelSettings()
+        assert ms.resolve_api_key("nonexistent") == ""
+
+    def test_list_multimodal_models(self):
+        """验证 list_multimodal_models 仅返回多模态模型。"""
+        ms = ModelSettings()
+        multimodal = ms.list_multimodal_models()
+        assert "qwen-flash" in multimodal
+        assert "qwen-plus" in multimodal
+        assert "zhipu-flash" in multimodal
+        assert "zhipu-flashx" in multimodal
+        assert "deepseek-flash" not in multimodal
+        assert "longcat-flash" not in multimodal
+
+    def test_list_text_models(self):
+        """验证 list_text_models 仅返回纯文本模型。"""
+        ms = ModelSettings()
+        text_only = ms.list_text_models()
+        assert "deepseek-flash" in text_only
+        assert "longcat-flash" in text_only
+        assert "qwen-flash" not in text_only
+        assert "zhipu-flash" not in text_only
 
 
 class TestSettings:

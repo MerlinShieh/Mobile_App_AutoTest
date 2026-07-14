@@ -5,9 +5,11 @@ uiautomator2 控制器封装模块。
 点击、输入、滑动、系统按键和应用管理等操作接口。
 """
 
+import io
 from typing import Optional
 
 import uiautomator2 as u2
+from PIL import Image
 
 from ..logger import get_logger
 
@@ -95,6 +97,9 @@ class U2Controller:
         """
         截取当前设备屏幕。
 
+        uiautomator2 v3 的 screenshot() 可能返回 PIL Image（JpegImageFile）
+        或 bytes，本方法统一转换为 bytes 返回。
+
         参数
         ----------
         quality : int
@@ -103,10 +108,16 @@ class U2Controller:
         返回
         -------
         bytes
-            PNG 格式的原始图片字节数据，由调用方负责格式转换。
+            JPEG 格式的原始图片字节数据。
         """
         try:
-            data: bytes = self._device.screenshot()
+            raw = self._device.screenshot()
+            if isinstance(raw, Image.Image):
+                buf = io.BytesIO()
+                raw.save(buf, format="JPEG", quality=quality)
+                data = buf.getvalue()
+            else:
+                data = bytes(raw)
             logger.debug("u2 截图成功，大小: %d 字节", len(data))
             return data
         except Exception as exc:
