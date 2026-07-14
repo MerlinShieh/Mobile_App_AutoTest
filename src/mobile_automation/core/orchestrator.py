@@ -151,7 +151,11 @@ class TaskOrchestrator:
                     break
 
                 if record.is_success():
-                    context.page_history.append(record.page_summary)
+                    action_desc = f"[{record.action.action_type.value}"
+                    if record.action.params.element_id:
+                        action_desc += f" #{record.action.params.element_id}"
+                    action_desc += f"] {record.action.reason[:60]}"
+                    context.page_history.append(f"{action_desc}\n{record.page_summary}")
                     logger.debug("任务 %s 步骤 %d 成功", context.task_id, step_index)
                 else:
                     logger.warning("任务 %s 步骤 %d 失败: %s",
