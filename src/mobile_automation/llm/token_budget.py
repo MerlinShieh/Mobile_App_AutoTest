@@ -91,6 +91,7 @@ class TokenBudgetManager:
         判断当前是否需要压缩历史消息以节约 Token。
 
         当已用 Token + 当前步 Token > 输入预算的 80% 时触发压缩。
+        与 get_compression_strategy 使用一致的阈值体系。
 
         参数
         ----------
@@ -102,13 +103,12 @@ class TokenBudgetManager:
         bool
             True 表示需要压缩，False 表示预算充足。
         """
-        threshold: int = int(self.input_budget * 1.0)
         total_needed: int = self.total_used + current_step_tokens
-        need: bool = total_needed > threshold
+        need: bool = total_needed > self.input_budget * 0.8
         if need:
             logger.warning(
-                "TokenBudgetManager 触发压缩: 已用=%d, 当前步=%d, 阈值=%d",
-                self.total_used, current_step_tokens, threshold,
+                "TokenBudgetManager 触发压缩: 已用=%d, 当前步=%d, 阈值=%.0f",
+                self.total_used, current_step_tokens, self.input_budget * 0.8,
             )
         return need
 
@@ -171,10 +171,11 @@ class TokenBudgetManager:
         """
         根据当前 Token 预算返回建议的压缩策略。
 
-        策略等级：
-        - "none": 预算充足，无需压缩
-        - "compress_history": 超出预算 50% 以内，压缩历史文本
-        - "drop_images": 超出预算 100% 以内，丢弃历史截图仅保留文本
+        考虑已消耗 Token 与当前步估算之和（累积预算），与 needs_compression
+        使用一致的阈值体系：
+        - "none": 累积预算 <= 预算的 80%（充足）
+        - "compress_history": 累积预算 <= 预算的 150%，压缩历史文本
+        - "drop_images": 累积预算 <= 预算的 200%，丢弃历史截图仅保留文本
         - "full_summary": 严重超预算，使用完整摘要压缩
 
         参数
@@ -188,19 +189,20 @@ class TokenBudgetManager:
             压缩策略名称: "none" / "compress_history" / "drop_images" / "full_summary"。
         """
         estimated: int = self.estimate_messages_tokens(messages)
+        total_needed: int = self.total_used + estimated
 
-        if estimated <= self.input_budget:
+        if total_needed <= self.input_budget * 0.8:
             strategy: str = "none"
-        elif estimated <= self.input_budget * 1.5:
+        elif total_needed <= self.input_budget * 1.5:
             strategy = "compress_history"
-        elif estimated <= self.input_budget * 2:
+        elif total_needed <= self.input_budget * 2.0:
             strategy = "drop_images"
         else:
             strategy = "full_summary"
 
         logger.info(
-            "TokenBudgetManager 压缩策略: %s (估算=%d, 预算=%d)",
-            strategy, estimated, self.input_budget,
+            "TokenBudgetManager 压缩策略: %s (已用=%d, 当前步估算=%d, 累积=%d, 预算=%d)",
+            strategy, self.total_used, estimated, total_needed, self.input_budget,
         )
         return strategy
 
