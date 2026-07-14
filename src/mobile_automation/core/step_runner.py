@@ -202,7 +202,7 @@ class StepRunner:
                 if record.action.action_type in (
                     ActionType.SWIPE, ActionType.SWIPE_POINT, ActionType.SCROLL,
                 ):
-                    time.sleep(0.8)
+                    time.sleep(settings.execution.page_stable_poll_ms / 1000.0)
 
                 self._dm.health_check()
 
@@ -384,48 +384,24 @@ class StepRunner:
         """
         转义 JSON 字符串值内部的未转义控制字符（\\n、\\r、\\t）。
 
-        仅处理双引号字符串内部的控制字符，JSON 结构中的换行（如字段间换行）
-        不会受影响 — 因为这些换行在字符串外部，无需转义。
-
-        参数
-        ----------
-        text : str
-            原始 JSON 文本。
-
-        返回
-        -------
-        str
-            控制字符已被转义的 JSON 文本。
+        使用正则替换替代逐字符循环，避免 O(n) 字符复制开销。
+        仅处理双引号字符串内部的控制字符，JSON 结构中的换行不受影响。
         """
-        result: list[str] = []
-        in_string: bool = False
-        i: int = 0
-        while i < len(text):
-            ch: str = text[i]
-            if in_string:
-                if ch == "\\":
-                    # 已转义的序列，原样保留并跳过下一个字符
-                    result.append(ch)
-                    if i + 1 < len(text):
-                        result.append(text[i + 1])
-                        i += 1
-                elif ch == "\n":
-                    result.append("\\n")
-                elif ch == "\r":
-                    result.append("\\r")
-                elif ch == "\t":
-                    result.append("\\t")
-                elif ch == "\"":
-                    in_string = False
-                    result.append(ch)
-                else:
-                    result.append(ch)
-            else:
-                if ch == "\"":
-                    in_string = True
-                result.append(ch)
-            i += 1
-        return "".join(result)
+        def _escape_ctrl(m: re.Match) -> str:
+            ch = m.group(0)
+            if ch == "\n":
+                return "\\n"
+            if ch == "\r":
+                return "\\r"
+            if ch == "\t":
+                return "\\t"
+            return ch
+
+        return re.sub(
+            r'(?<=")(?:[^"\\]|\\.)*?(?=")',
+            lambda m: re.sub(r'[\n\r\t]', _escape_ctrl, m.group(0)),
+            text,
+        )
 
     @staticmethod
     def _parse_llm_response(response: str) -> Action:
