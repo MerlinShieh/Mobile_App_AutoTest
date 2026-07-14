@@ -19,7 +19,7 @@ import argparse
 import io
 import sys
 import time
-from typing import Any
+from typing import Any, Optional
 
 from .config import settings
 from .core.orchestrator import TaskOrchestrator
@@ -135,6 +135,14 @@ def build_app(args: argparse.Namespace) -> tuple[TaskOrchestrator, DeviceManager
         retention_days=settings.logger.log_retention_days,
     )
 
+    provider_name = args.provider or settings.llm.provider
+    provider_cfg = settings.models.providers.get(provider_name)
+    if provider_cfg and not provider_cfg.api_key:
+        raise RuntimeError(
+            f"供应商 {provider_name} 的 API Key 未配置，请在 .env 中设置 "
+            f"MODELS__PROVIDERS__{provider_name.upper()}__API_KEY"
+        )
+
     dm: DeviceManager = DeviceManager()
     serial: str = args.serial or settings.device.serial
     logger.info("连接设备: serial=%s", serial or "自动选择")
@@ -246,6 +254,7 @@ def main() -> int:
     int
         退出码：0 表示任务成功或部分成功，1 表示任务失败或出错。
     """
+    dm: Optional[DeviceManager] = None
     try:
         args: argparse.Namespace = parse_args()
         orchestrator, dm = build_app(args)

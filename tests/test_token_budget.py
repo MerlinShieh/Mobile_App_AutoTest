@@ -83,14 +83,25 @@ class TestTokenBudgetManager:
         assert estimated == len("Hello World") // 2
 
     def test_estimate_messages_tokens_with_image(self):
-        """验证含图片消息的 Token 估算。"""
+        """验证含图片消息的 Token 估算（基于 Base64 长度计算而非固定值）。"""
         manager = TokenBudgetManager("qwen")
+        text_only = len("描述图片") // 2
         messages = [LLMMessage(role="user", content=[
             {"type": "text", "text": "描述图片"},
             {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}},
         ])]
         estimated = manager.estimate_messages_tokens(messages)
-        assert estimated == len("描述图片") // 2 + 1000
+        assert estimated > text_only
+        assert estimated < text_only + 1000
+
+    def test_estimate_messages_tokens_image_fallback(self):
+        """验证非 Base64 图片 URL 回退为固定值 1000。"""
+        manager = TokenBudgetManager("qwen")
+        messages = [LLMMessage(role="user", content=[
+            {"type": "image_url", "image_url": {"url": "https://example.com/photo.jpg"}},
+        ])]
+        estimated = manager.estimate_messages_tokens(messages)
+        assert estimated == 1000
 
     def test_compression_strategy_none(self, monkeypatch):
         """验证预算充足时策略为 none。"""

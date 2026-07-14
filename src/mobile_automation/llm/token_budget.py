@@ -112,11 +112,37 @@ class TokenBudgetManager:
             )
         return need
 
+    @staticmethod
+    def _estimate_image_tokens(item: dict) -> int:
+        """
+        估算单张图片的 Token 消耗数。
+
+        基于 Base64 数据长度估算图片分辨率，采用 OpenAI 高细节公式：
+          tokens = ceil(width / 512) * ceil(height / 512) * 170 + 85
+        当无法解析 Base64 时回退为固定值 1000。
+        """
+        image_url = item.get("image_url", {}) if isinstance(item, dict) else {}
+        url = image_url.get("url", "") if isinstance(image_url, dict) else ""
+        if not isinstance(url, str) or not url.startswith("data:image/"):
+            return 1000
+
+        base64_part = url.split(",", 1)[-1] if "," in url else url
+        file_bytes = len(base64_part) * 3 // 4
+        if file_bytes < 1000:
+            return 85
+
+        pixel_est = int(file_bytes * 8 / 2.5)
+        side = int(pixel_est ** 0.5)
+        tiles_x = max(1, (side + 511) // 512)
+        tiles_y = max(1, (side + 511) // 512)
+        return tiles_x * tiles_y * 170 + 85
+
     def estimate_messages_tokens(self, messages: list[LLMMessage]) -> int:
         """
         估算消息列表的总 Token 消耗数。
 
-        文本按字符数的一半估算，图片按每张 1000 Token 估算。
+        文本按字符数的一半估算，图片根据 Base64 数据长度按 OpenAI
+        标准公式估算（回退值为 1000）。
 
         参数
         ----------
@@ -134,10 +160,11 @@ class TokenBudgetManager:
                 total += len(msg.content) // 2
             elif isinstance(msg.content, list):
                 for item in msg.content:
-                    if item.get("type") == "text":
-                        total += len(item.get("text", "")) // 2
-                    elif item.get("type") == "image_url":
-                        total += 1000
+                    if isinstance(item, dict):
+                        if item.get("type") == "text":
+                            total += len(item.get("text", "")) // 2
+                        elif item.get("type") == "image_url":
+                            total += self._estimate_image_tokens(item)
         return total
 
     def get_compression_strategy(self, messages: list[LLMMessage]) -> str:

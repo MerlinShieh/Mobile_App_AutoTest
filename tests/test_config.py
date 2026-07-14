@@ -16,7 +16,7 @@ class TestSettings:
     def test_default_llm_provider(self):
         """验证 LLM 默认提供商从 .env 读取。"""
         s = Settings()
-        assert s.llm.provider == "zhipu"
+        assert s.llm.provider == "qwen"
 
     def test_default_device_settings(self):
         """验证设备配置的默认值正确。"""

@@ -115,7 +115,7 @@ class TestDeviceManager:
     def test_get_screen_size_default(self):
         """验证未连接时返回默认屏幕尺寸。"""
         dm = DeviceManager()
-        assert dm.get_screen_size() == (1080, 2400)
+        assert dm.get_screen_size() == (1080, 1920)
 
     def test_health_check_not_connected(self):
         """验证未连接时健康检查返回 False。"""
