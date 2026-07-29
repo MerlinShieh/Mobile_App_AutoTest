@@ -156,14 +156,14 @@ class ADBController:
 
     def lock_screen(self) -> None:
         """
-        锁定/熄屏设备。
+        锁定/熄屏设备（toggle 操作）。
 
-        通过 ADB 发送 KeyEvent 26（电源键）切换屏幕为锁定状态。
-        注意：此操作为 toggle 性质，如果屏幕已锁定可能会解锁。
-        建议在已知屏幕亮起状态下调用。
+        通过 ADB 发送 KeyEvent 26（电源键）切换屏幕锁定状态。
+        此操作为 toggle 性质：若屏幕当前亮起则锁定；若已锁定则可能
+        唤醒屏幕。调用方应确保在屏幕亮起时调用以获得锁定效果。
         """
         self.shell("input keyevent 26")
-        logger.info("设备已执行熄屏操作")
+        logger.info("设备已执行熄屏/电源键操作")
 
     def open_notifications(self) -> None:
         """

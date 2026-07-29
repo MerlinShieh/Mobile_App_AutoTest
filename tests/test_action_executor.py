@@ -219,8 +219,12 @@ class TestActionExecutor:
         """验证初始化时创建所有子执行器。"""
         mock_dm = mocker.MagicMock()
         executor = ActionExecutor(mock_dm)
-        assert len(executor._executors) == 9
         assert ActionType.CLICK in executor._executors
+        assert ActionType.DOUBLE_CLICK in executor._executors
+        assert ActionType.LONG_CLICK in executor._executors
         assert ActionType.TYPE in executor._executors
+        assert ActionType.CLEAR_TEXT in executor._executors
         assert ActionType.SWIPE in executor._executors
+        assert ActionType.SWIPE_POINT in executor._executors
+        assert ActionType.SCROLL in executor._executors
         assert ActionType.WAIT in executor._executors
