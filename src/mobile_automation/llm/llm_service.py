@@ -39,6 +39,7 @@ class LLMServiceFactory:
         "anthropic": ClaudeAdapter,
         "zhipu": ZhipuAdapter,
         "mimo": MiMoAdapter,
+        "local": OpenAIAdapter,
     }
     """提供商名称到 Adapter 类的映射字典。"""
 

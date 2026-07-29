@@ -94,6 +94,10 @@ class ModelSettings(BaseSettings):
                 api_key="",
                 base_url="https://api.xiaomimimo.com/v1",
             ),
+            "local": ProviderConfig(
+                api_key="",
+                base_url="http://localhost:8080/v1",
+            ),
         },
         description="所有模型供应商的共享配置字典（API Key、Base URL）",
     )
@@ -111,6 +115,13 @@ class ModelSettings(BaseSettings):
                 model_name="mimo-v2.5-pro",
                 model_type="text",
                 context_window=1000000,
+            ),
+            # ---- 本地大模型（llama-server） ----
+            "local-model": ModelEntry(
+                provider="local",
+                model_name="LocalModel",
+                model_type="text",
+                context_window=32000,
             ),
             # ---- Qwen 多模态模型 ----
             "qwen-flash": ModelEntry(

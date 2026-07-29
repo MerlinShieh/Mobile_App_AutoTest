@@ -38,24 +38,44 @@ class OpenAIAdapter(LLMAdapter):
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         model_name: Optional[str] = None,
+        provider: Optional[str] = None,
     ) -> None:
         """
         初始化 OpenAIAdapter。
 
+        优先从 settings.models.providers 读取配置（多模型架构），
+        未找到时回退到 settings.llm（向后兼容）。
+
         参数
         ----------
         api_key : Optional[str]
-            OpenAI API 密钥，未传入时从 settings.llm.api_key 读取。
+            API 密钥，未传入时从配置读取。
         base_url : Optional[str]
-            API 请求基础地址，未传入时从 settings.llm.base_url 读取。
+            API 请求基础地址，未传入时从配置读取。
         model_name : Optional[str]
-            模型名称，未传入时从 settings.llm.model_name 读取。
+            模型名称，未传入时从配置读取。
+        provider : Optional[str]
+            提供商名称，用于从 settings.models.providers 查找配置。
         """
-        self._api_key: str = api_key or settings.llm.api_key
-        self._base_url: str = base_url or settings.llm.base_url
-        self._model: str = model_name or settings.llm.model_name or "gpt-4o"
+        provider_cfg = settings.models.providers.get(provider or "") if provider else None
+        if provider_cfg:
+            self._api_key: str = api_key or provider_cfg.api_key
+            self._base_url: str = base_url or provider_cfg.base_url
+            # 从模型注册表查找该 provider 的模型名称
+            self._model: str = model_name or ""
+            if not self._model:
+                for model_entry in settings.models.models.values():
+                    if model_entry.provider == provider:
+                        self._model = model_entry.model_name
+                        break
+            if not self._model:
+                self._model = "gpt-4o"
+        else:
+            self._api_key = api_key or settings.llm.api_key
+            self._base_url = base_url or settings.llm.base_url
+            self._model = model_name or settings.llm.model_name or "gpt-4o"
 
-        logger.info("OpenAIAdapter 初始化: model=%s", self._model)
+        logger.info("OpenAIAdapter 初始化: model=%s, base_url=%s", self._model, self._base_url)
 
         self._client: OpenAI = OpenAI(
             api_key=self._api_key,

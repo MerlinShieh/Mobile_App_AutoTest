@@ -86,7 +86,7 @@ def parse_args() -> argparse.Namespace:
         "-p", "--provider",
         type=str,
         default="",
-        choices=["qwen", "openai", "anthropic", "zhipu", "mimo"],
+        choices=["qwen", "openai", "anthropic", "zhipu", "mimo", "local"],
         help="LLM 提供商（默认从配置文件读取）",
     )
     parser.add_argument(
