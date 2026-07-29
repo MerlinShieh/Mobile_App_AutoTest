@@ -87,18 +87,21 @@ class TestModelSettings:
     """测试 ModelSettings 多模型配置管理。"""
 
     def test_default_providers_count(self):
-        """验证默认供应商数量（qwen/zhipu/deepseek/longcat）。"""
+        """验证默认供应商数量（qwen/zhipu/deepseek/longcat/mimo）。"""
         ms = ModelSettings()
-        assert len(ms.providers) == 4
+        assert len(ms.providers) == 5
         assert "qwen" in ms.providers
         assert "zhipu" in ms.providers
         assert "deepseek" in ms.providers
         assert "longcat" in ms.providers
+        assert "mimo" in ms.providers
 
     def test_default_models_count(self):
-        """验证默认模型注册表数量（6 个模型条目）。"""
+        """验证默认模型注册表数量（8 个模型条目）。"""
         ms = ModelSettings()
-        assert len(ms.models) == 6
+        assert len(ms.models) == 8
+        assert "mimo-omni" in ms.models
+        assert "mimo-pro" in ms.models
         assert "qwen-flash" in ms.models
         assert "qwen-plus" in ms.models
         assert "zhipu-flash" in ms.models
@@ -109,7 +112,7 @@ class TestModelSettings:
     def test_default_multimodal_and_text(self):
         """验证默认多模态/纯文本模型 key 正确。"""
         ms = ModelSettings()
-        assert ms.default_multimodal == "qwen-flash"
+        assert ms.default_multimodal == "mimo-omni"
         assert ms.default_text == "deepseek-flash"
 
     def test_get_model_found(self):

@@ -90,11 +90,28 @@ class ModelSettings(BaseSettings):
                 api_key="",
                 base_url="https://api.longcat.chat/v1",
             ),
+            "mimo": ProviderConfig(
+                api_key="",
+                base_url="https://api.xiaomimimo.com/v1",
+            ),
         },
         description="所有模型供应商的共享配置字典（API Key、Base URL）",
     )
     models: dict[str, ModelEntry] = Field(
         default_factory=lambda: {
+            # ---- MiMo 多模态模型（小米） ----
+            "mimo-omni": ModelEntry(
+                provider="mimo",
+                model_name="mimo-v2.5",
+                model_type="multimodal",
+                context_window=128000,
+            ),
+            "mimo-pro": ModelEntry(
+                provider="mimo",
+                model_name="mimo-v2.5-pro",
+                model_type="text",
+                context_window=1000000,
+            ),
             # ---- Qwen 多模态模型 ----
             "qwen-flash": ModelEntry(
                 provider="qwen",
@@ -139,7 +156,7 @@ class ModelSettings(BaseSettings):
         description="模型注册表: model_key → ModelEntry（provider + model_name + 能力标签）",
     )
     default_multimodal: str = Field(
-        default="qwen-flash",
+        default="mimo-omni",
         description="默认多模态模型 key（需视觉理解的任务）",
     )
     default_text: str = Field(

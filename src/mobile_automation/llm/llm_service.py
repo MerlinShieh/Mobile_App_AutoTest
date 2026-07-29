@@ -11,6 +11,7 @@ from ..config import settings
 from ..logger import get_logger
 from .base import LLMAdapter, LLMMessage
 from .claude_adapter import ClaudeAdapter
+from .mimo_adapter import MiMoAdapter
 from .openai_adapter import OpenAIAdapter
 from .qwen_adapter import QwenAdapter
 from .zhipu_adapter import ZhipuAdapter
@@ -37,6 +38,7 @@ class LLMServiceFactory:
         "openai": OpenAIAdapter,
         "anthropic": ClaudeAdapter,
         "zhipu": ZhipuAdapter,
+        "mimo": MiMoAdapter,
     }
     """提供商名称到 Adapter 类的映射字典。"""
 

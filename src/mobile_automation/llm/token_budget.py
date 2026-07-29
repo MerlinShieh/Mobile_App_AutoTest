@@ -34,6 +34,7 @@ class TokenBudgetManager:
         "openai": 128000,
         "anthropic": 200000,
         "zhipu": 128000,
+        "mimo": 128000,
     }
     """各提供商模型的上下文窗口大小映射。"""
 

@@ -33,6 +33,13 @@ class TestLLMServiceFactory:
         adapter = LLMServiceFactory.create("anthropic")
         assert adapter == mock_adapter
 
+    def test_create_mimo_adapter(self, mocker):
+        """验证创建 mimo 适配器。"""
+        mock_adapter = mocker.MagicMock(spec=LLMAdapter)
+        mocker.patch.object(LLMServiceFactory, "_adapters", {"mimo": lambda: mock_adapter})
+        adapter = LLMServiceFactory.create("mimo")
+        assert adapter == mock_adapter
+
     def test_create_invalid_provider_raises(self):
         """验证不支持的提供商抛出异常。"""
         with pytest.raises(ValueError, match="不支持的 LLM 提供商"):
