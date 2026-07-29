@@ -42,7 +42,9 @@ class TokenBudgetManager:
         初始化 TokenBudgetManager。
 
         根据提供商名称读取对应的上下文窗口大小，并计算输入预算
-        （上下文窗口减去输出保留 Token）。
+        （上下文窗口减去输出保留 Token）。优先从 settings.models
+        模型配置读取 context_window，保持与 ModelEntry 定义一致；
+        未匹配时回退到内置 CONTEXT_WINDOWS 兜底。
 
         参数
         ----------
@@ -50,7 +52,7 @@ class TokenBudgetManager:
             LLM 提供商名称，为 None 时从 settings.llm.provider 读取。
         """
         self._provider: str = provider or settings.llm.provider
-        self.max_context: int = self.CONTEXT_WINDOWS.get(self._provider, 32000)
+        self.max_context: int = self._resolve_context_window()
         self.output_reserve: int = settings.llm.max_tokens
         self.input_budget: int = self.max_context - self.output_reserve
         self.total_used: int = 0
@@ -59,6 +61,19 @@ class TokenBudgetManager:
             "TokenBudgetManager 初始化: provider=%s, context=%d, input_budget=%d",
             self._provider, self.max_context, self.input_budget,
         )
+
+    def _resolve_context_window(self) -> int:
+        """
+        从配置中解析当前提供商的上下文窗口大小。
+
+        优先从 settings.models 模型注册表查找匹配 provider 的
+        ModelEntry.context_window，确保与用户配置保持同步。
+        未匹配时回退到内置 CONTEXT_WINDOWS 字典，兜底 32000。
+        """
+        for model_entry in settings.models.models.values():
+            if model_entry.provider == self._provider:
+                return model_entry.context_window
+        return self.CONTEXT_WINDOWS.get(self._provider, 32000)
 
     def get_available_budget(self) -> int:
         """
