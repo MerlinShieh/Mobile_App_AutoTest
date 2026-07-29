@@ -53,7 +53,7 @@ class ActionExecutor:
             设备管理器实例。
         """
         self._dm: DeviceManager = device_manager
-        self._executors: dict[ActionType, object] = {
+        self._executors: dict[ActionType, ClickExecutor | TypeExecutor | SwipeExecutor | WaitExecutor] = {
             ActionType.CLICK: ClickExecutor(device_manager),
             ActionType.DOUBLE_CLICK: ClickExecutor(device_manager),
             ActionType.LONG_CLICK: ClickExecutor(device_manager),
@@ -181,7 +181,12 @@ class ActionExecutor:
         返回
         -------
         int
-            旋转值（0-3），默认 0（竖屏）。
+            旋转值（0-3）。
+
+        异常
+        ------
+        ValueError
+            direction 为非空但不在已知映射中时抛出。
         """
         mapping: dict[str, int] = {
             "portrait": 0,
@@ -189,7 +194,11 @@ class ActionExecutor:
             "reverse_portrait": 2,
             "reverse_landscape": 3,
         }
-        return mapping.get(direction, 0)
+        if not direction:
+            return 0
+        if direction not in mapping:
+            raise ValueError(f"无效的旋转方向: {direction}，有效值: {list(mapping.keys())}")
+        return mapping[direction]
 
     @staticmethod
     def _apply_tuning(params: ActionParams) -> None:

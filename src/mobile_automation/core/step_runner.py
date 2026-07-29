@@ -13,6 +13,7 @@
   7. 记录：将执行结果写入 StepRecord，返回给 Orchestrator。
 """
 
+import base64
 import json
 import re
 import time
@@ -27,7 +28,6 @@ from ..logger import get_logger
 from ..models.action import Action, ActionParams
 from ..models.enums import ActionType, StepStatus
 from ..models.perception import PerceptualResult, UITree
-import base64
 
 from ..models.task import StepRecord
 from ..perception.page_diff import PageChangeDetector
@@ -125,7 +125,7 @@ class StepRunner:
             Token 预算管理器实例。
         """
         self._token_budget = token_budget
-        logger.debug("StepRunner 已绑定 TokenBudget: provider=%s", token_budget._provider)
+        logger.debug("StepRunner 已绑定 TokenBudget: provider=%s", token_budget.provider)
 
     def run_step(
         self,

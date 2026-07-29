@@ -233,7 +233,7 @@ class PopupHandler:
             n for n in tree.local_index.values()
             if n.text and n.text.strip().lower() in self.FEATURE_TEXTS
         ]
-        unique_texts = set(n.text.strip().lower() for n in matched)
+        unique_texts = {n.text.strip().lower() for n in matched}
         if len(unique_texts) >= 2:
             return matched
         return []

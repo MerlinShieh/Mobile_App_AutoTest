@@ -62,6 +62,11 @@ class TokenBudgetManager:
             self._provider, self.max_context, self.input_budget,
         )
 
+    @property
+    def provider(self) -> str:
+        """当前绑定的 LLM 提供商名称。"""
+        return self._provider
+
     def _resolve_context_window(self) -> int:
         """
         从配置中解析当前提供商的上下文窗口大小。
