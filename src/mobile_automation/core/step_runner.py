@@ -359,6 +359,7 @@ class StepRunner:
 
         # ---- Token 预算检查与压缩策略决策 ----
         compression_strategy: str = "none"
+        enable_reasoning: bool = settings.models.enable_reasoning
         if self._token_budget is not None and task_context.page_history:
             # 预估本次消息的 Token 消耗
             preview_msgs = self._decision_builder.build(
@@ -368,6 +369,7 @@ class StepRunner:
                 history=task_context.page_history,
                 step_index=task_context.current_step + 1,
                 compression_strategy="none",
+                enable_reasoning=enable_reasoning,
             )
             estimated = self._token_budget.estimate_messages_tokens(preview_msgs)
 
@@ -384,6 +386,7 @@ class StepRunner:
             history=task_context.page_history,
             step_index=task_context.current_step + 1,
             compression_strategy=compression_strategy,
+            enable_reasoning=enable_reasoning,
         )
 
         response: str = self._llm.chat(messages)

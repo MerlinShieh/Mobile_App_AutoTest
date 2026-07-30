@@ -174,6 +174,10 @@ class ModelSettings(BaseSettings):
         default="deepseek-flash",
         description="默认纯文本模型 key（无需视觉的任务）",
     )
+    enable_reasoning: bool = Field(
+        default=True,
+        description="是否启用思维链推理（<think> 标签）。关闭后模型直接输出 JSON 操作，不进行中间推理。",
+    )
 
     # ---- 便捷查询方法 ----
 

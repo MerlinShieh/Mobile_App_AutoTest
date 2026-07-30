@@ -117,6 +117,11 @@ class TestModelSettings:
         assert ms.default_multimodal == "mimo-omni"
         assert ms.default_text == "deepseek-flash"
 
+    def test_default_enable_reasoning(self):
+        """验证默认思维链推理开启。"""
+        ms = ModelSettings()
+        assert ms.enable_reasoning is True
+
     def test_get_model_found(self):
         """验证 get_model 返回存在的模型。"""
         ms = ModelSettings()

@@ -117,9 +117,11 @@ class MiMoAdapter(LLMAdapter):
         content: str = message.content or ""
 
         # MiMo 的 reasoning_content（思维链）与 content 拼接
-        reasoning = getattr(message, "reasoning_content", None)
-        if reasoning:
-            content = f"<think>{reasoning}</think>\n{content}" if content else f"<think>{reasoning}</think>"
+        # 仅在 enable_reasoning=True 时捕获，避免图片推理耗时过长
+        if settings.models.enable_reasoning:
+            reasoning = getattr(message, "reasoning_content", None)
+            if reasoning:
+                content = f"<think>{reasoning}</think>\n{content}" if content else f"<think>{reasoning}</think>"
 
         logger.debug("MiMoAdapter.chat 收到回复: %d 字符", len(content))
         return content
