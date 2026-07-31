@@ -52,6 +52,29 @@ class TestStepRunner:
         assert record.status == StepStatus.SUCCESS
         assert record.step_index == 1
 
+    def test_run_step_max_retries_zero(self, mocker, mock_device_manager, mock_perception, mock_llm_service):
+        """验证 max_retries_per_step=0 时步骤直接标记为 FAILED 而非 PENDING。"""
+        mocker.patch("mobile_automation.core.step_runner.settings.execution.max_retries_per_step", 0)
+        mock_popup = mocker.MagicMock()
+        mock_popup.detect.return_value = None
+
+        mock_executor = mocker.MagicMock()
+        mock_executor.execute.return_value = True
+
+        runner = StepRunner(
+            device_manager=mock_device_manager,
+            perception=mock_perception,
+            popup_handler=mock_popup,
+            llm_service=mock_llm_service,
+            action_executor=mock_executor,
+        )
+
+        context = TaskContext(task_id="test-001", user_goal="测试操作")
+        record = runner.run_step(1, context)
+
+        assert record.status == StepStatus.FAILED
+        assert "max_retries_per_step" in record.error_message
+
     def test_run_step_popup_handled(self, mocker, mock_device_manager, mock_perception, mock_llm_service):
         """验证弹窗被处理后重试直到成功。"""
         mock_popup = mocker.MagicMock()

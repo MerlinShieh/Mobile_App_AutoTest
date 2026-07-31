@@ -101,7 +101,9 @@ class TaskOrchestrator:
         context: TaskContext = TaskContext(
             task_id=str(uuid.uuid4())[:8],
             user_goal=user_goal,
-            max_steps=max_steps or settings.execution.max_steps_per_task,
+            # 仅在显式传入 None 时使用配置默认值；max_steps=0 表示"不限制步数"
+            # （or 运算符会错误地把 0 当成假值替换为默认值）
+            max_steps=settings.execution.max_steps_per_task if max_steps is None else max_steps,
         )
 
         self._last_actions = []
@@ -117,7 +119,10 @@ class TaskOrchestrator:
         logger.info("任务 %s 开始执行: user_goal=%s, max_steps=%d",
                      context.task_id, user_goal, context.max_steps)
 
-        while not context.is_completed() and context.current_step < context.max_steps:
+        # max_steps=0 表示不限制步数（由任务超时或完成条件终止）
+        while not context.is_completed() and (
+            context.max_steps == 0 or context.current_step < context.max_steps
+        ):
             if self._check_timeout(context):
                 context.status = TaskStatus.FAILED
                 logger.warning("任务 %s 超时，已执行 %d 步", context.task_id, context.current_step)

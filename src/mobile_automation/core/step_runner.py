@@ -217,8 +217,17 @@ class StepRunner:
                         step_index, None, record.action, record.status.value,
                         error=record.error_message,
                     )
+                    # 标记失败后立即跳出循环，避免下一轮迭代将状态覆盖为 RUNNING
+                    break
                 else:
                     record.status = StepStatus.RETRYING
+
+        # max_retries_per_step=0 时上方循环不执行，状态保持 PENDING，
+        # 直接标记为 FAILED，避免调用方收到无意义的 PENDING 状态
+        if record.status == StepStatus.PENDING:
+            record.status = StepStatus.FAILED
+            record.error_message = "max_retries_per_step 配置为 0，步骤无法执行"
+            logger.error("Step %d %s", step_index, record.error_message)
 
         return record
 
@@ -416,12 +425,13 @@ class StepRunner:
             attempt=attempt,
         )
 
-        # ---- 记录 Token 消耗 ----
+        action: Action = self._parse_llm_response(response)
+
+        # ---- 记录 Token 消耗（解析成功后记录，避免解析失败虚增消耗） ----
         if self._token_budget is not None:
             actual_tokens = self._token_budget.estimate_messages_tokens(messages)
             self._token_budget.record_usage(actual_tokens)
 
-        action: Action = self._parse_llm_response(response)
         return action
 
     def _resolve_action_coordinates(self, action: Action, perceptual: PerceptualResult) -> None:
