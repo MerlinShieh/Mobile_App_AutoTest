@@ -48,36 +48,40 @@ mobile_automation/
 
 | 供应商 | 默认模型 | 能力 | API 端点 |
 |--------|---------|------|----------|
+| **MiMo** | mimo-v2.5 | 多模态（文本+视觉+思维链） | `https://api.xiaomimimo.com/v1` |
 | **Qwen** | qwen3.6-flash | 多模态（文本+视觉） | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
 | **Zhipu** | glm-4.1v-thinking-flash | 多模态 | `https://open.bigmodel.cn/api/paas/v4` |
 | **DeepSeek** | deepseek-v4-flash | 纯文本 | `https://api.deepseek.com` |
 | **LongCat** | LongCat-2.0 | 纯文本 | `https://api.longcat.chat/openai` |
+| **Local** | LocalModel | 纯文本（llama-server 本地） | `http://localhost:8080/v1` |
 
-**多模态默认**：glm-4.1v-thinking-flash  
-**纯文本默认**：deepseek-v4-flash
+**多模态默认**：mimo-omni（`MODELS__DEFAULT_MULTIMODAL` 可覆盖）
+**纯文本默认**：deepseek-flash（`MODELS__DEFAULT_TEXT` 可覆盖）
+**思维链开关**：`MODELS__ENABLE_REASONING`（默认 true，图片推理耗时可关闭）
 
 ## 当前项目状态
 
 **已完成：**
-- 三层架构重组（framework + mobile + 横切层）
-- 多模型适配重构（统一适配器 + ModelRegistry）
-- CoT 思维链 Prompt 引导
-- 弹窗检测误报修复（三层过滤机制）
+- 模块化架构（core 编排 + device/executor/perception/popup + llm 横切层）
+- 多模型适配重构（统一适配器 + 模型注册表，支持 Qwen/Zhipu/MiMo/DeepSeek/LongCat/本地 llama）
+- CoT 思维链 Prompt 引导（`MODELS__ENABLE_REASONING` 可关闭）
+- 弹窗检测误报修复（三层过滤 + 屏幕尺寸防御）
 - u2 截图类型修复（bytes/PIL Image 自动转换）
-- u2 连接超时保护（30s 守护线程）
-- 报告格式标准化（纯 Markdown）
+- u2 连接超时保护（30s）
+- 报告格式标准化（纯 Markdown，含特殊字符转义）
 - 日志自动初始化
+- 异常体系重构（ErrorHandler 集成重连/指数退避恢复）
+- 行尾符规范化（.gitattributes, LF）
 
 **测试数据：**
-- 单元测试：370 个，100% 通过
-- 覆盖率：约 64%（阈值 60%）
+- 单元测试：341 个，100% 通过
 - 端到端自动测试：6 用例，通过率 33%（2/6）
 
-## 已知 P0 问题
+## 已知问题
 
-1. **LLM Prompt 语义理解**：模型只点击搜索框不输入文本 → 需要优化 decision_prompt
-2. **弹窗检测误报**：仍偶发误报导致死循环 → 需持续优化特征文本过滤
-3. **操作缺失**：缺少拖拽操作支持（已新增熄屏 LOCK_SCREEN、通知栏 OPEN_NOTIFICATIONS、旋转 ROTATE_SCREEN、音量± VOLUME_UP/VOLUME_DOWN 共5个物理操作）
+1. **LLM Prompt 语义理解**：模型只点击搜索框不输入文本 → 需要优化 decision_prompt（Prompt 已强化，需端到端验证）
+2. **弹窗检测误报**：仍偶发误报导致死循环 → 需持续优化特征文本过滤（已加 (0,0) 尺寸防御）
+3. **StepRunner 上帝类**：708 行，5 种职责耦合 → 拆分方案已出，待专项执行
 
 ## 常用命令
 

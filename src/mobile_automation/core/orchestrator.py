@@ -176,7 +176,9 @@ class TaskOrchestrator:
                     break
 
             except Exception as exc:
-                logger.error("任务 %s 步骤 %d 发生未预期异常: %s", context.task_id, step_index, exc)
+                # exc_info=True 保留完整 traceback，便于排查未预期异常
+                logger.error("任务 %s 步骤 %d 发生未预期异常: %s", context.task_id, step_index, exc,
+                             exc_info=True)
                 context.status = TaskStatus.FAILED
                 break
 
