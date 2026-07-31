@@ -36,7 +36,8 @@ class LLMAdapter(ABC):
     LLM 适配器抽象基类。
 
     所有具体 LLM 提供商（Qwen / OpenAI / Anthropic）的适配器必须
-    继承此类并实现 chat、count_tokens 和 context_window 属性。
+    继承此类并实现 chat 和 context_window 属性。count_tokens 提供
+    默认实现（文本字符数/2 + 图片 Base64 精确估算），子类可覆盖。
 
     使用方式
     --------
@@ -46,8 +47,6 @@ class LLMAdapter(ABC):
     ...         return 32000
     ...     def chat(self, messages, **kwargs) -> str:
     ...         return "response"
-    ...     def count_tokens(self, messages) -> int:
-    ...         return 0
     """
 
     @abstractmethod
@@ -73,10 +72,12 @@ class LLMAdapter(ABC):
             API 调用失败、超时或返回异常状态时抛出。
         """
 
-    @abstractmethod
     def count_tokens(self, messages: list[LLMMessage]) -> int:
         """
         估算给定消息列表的 Token 消耗数。
+
+        默认实现：文本按字符数/2 估算（约 2 字符/Token），
+        图片按 Base64 数据长度精确估算（所有适配器共用同一逻辑）。
 
         参数
         ----------
@@ -86,8 +87,56 @@ class LLMAdapter(ABC):
         返回
         -------
         int
-            估算的 Token 总数。文本按字符数/2 估算，图片按固定值估算。
+            估算的 Token 总数。
         """
+        total: int = 0
+        for msg in messages:
+            if isinstance(msg.content, str):
+                total += len(msg.content) // 2
+            elif isinstance(msg.content, list):
+                for item in msg.content:
+                    if not isinstance(item, dict):
+                        total += len(str(item)) // 2
+                        continue
+                    if item.get("type") == "text":
+                        total += len(item.get("text", "")) // 2
+                    elif item.get("type") == "image_url":
+                        total += self._estimate_image_tokens(item)
+            else:
+                total += len(str(msg.content)) // 2
+        return total
+
+    @staticmethod
+    def _estimate_image_tokens(item: dict) -> int:
+        """
+        基于 Base64 数据长度估算图片 Token 消耗。
+
+        小图（<1000 字节）按固定 85 Token，大图按 512x512 tile
+        估算（每 tile 170 Token + 基础 85 Token）。
+
+        参数
+        ----------
+        item : dict
+            image_url 内容块字典。
+
+        返回
+        -------
+        int
+            估算的图片 Token 数。
+        """
+        image_url = item.get("image_url", {}) if isinstance(item, dict) else {}
+        url = image_url.get("url", "") if isinstance(image_url, dict) else ""
+        if not isinstance(url, str) or not url.startswith("data:image/"):
+            return 1000
+        base64_part = url.split(",", 1)[-1] if "," in url else url
+        file_bytes = len(base64_part) * 3 // 4
+        if file_bytes < 1000:
+            return 85
+        pixel_est = int(file_bytes * 8 / 2.5)
+        side = int(pixel_est ** 0.5)
+        tiles_x = max(1, (side + 511) // 512)
+        tiles_y = max(1, (side + 511) // 512)
+        return tiles_x * tiles_y * 170 + 85
 
     @property
     @abstractmethod

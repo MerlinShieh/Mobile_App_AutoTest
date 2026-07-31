@@ -140,32 +140,3 @@ class ClaudeAdapter(LLMAdapter):
         result: str = response.content[0].text if response.content else ""
         logger.debug("ClaudeAdapter.chat 收到回复: %d 字符", len(result))
         return result
-
-    def count_tokens(self, messages: list[LLMMessage]) -> int:
-        """
-        估算 Claude 消息列表的 Token 消耗数。
-
-        文本按字符数的一半估算，图片按每张 1000 Token 估算。
-
-        参数
-        ----------
-        messages : list[LLMMessage]
-            待估算的消息列表。
-
-        返回
-        -------
-        int
-            估算的 Token 总数。
-        """
-        total: int = 0
-        for msg in messages:
-            if isinstance(msg.content, str):
-                total += len(msg.content) // 2
-            elif isinstance(msg.content, list):
-                for item in msg.content:
-                    if item.get("type") == "text":
-                        total += len(item.get("text", "")) // 2
-                    elif item.get("type") == "image_url":
-                        total += 1000
-        logger.debug("ClaudeAdapter.count_tokens: %d 条消息共约 %d token", len(messages), total)
-        return total

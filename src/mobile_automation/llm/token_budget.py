@@ -9,7 +9,7 @@ from typing import Optional
 
 from ..config import settings
 from ..logger import get_logger
-from .base import LLMMessage
+from .base import LLMAdapter, LLMMessage
 
 logger = get_logger(__name__)
 
@@ -141,22 +141,11 @@ class TokenBudgetManager:
         基于 Base64 数据长度估算图片分辨率，采用 OpenAI 高细节公式：
           tokens = ceil(width / 512) * ceil(height / 512) * 170 + 85
         当无法解析 Base64 时回退为固定值 1000。
+
+        与 LLMAdapter._estimate_image_tokens 保持一致（单一估算来源），
+        两处共用同一算法，避免不同模块估算结果不一致。
         """
-        image_url = item.get("image_url", {}) if isinstance(item, dict) else {}
-        url = image_url.get("url", "") if isinstance(image_url, dict) else ""
-        if not isinstance(url, str) or not url.startswith("data:image/"):
-            return 1000
-
-        base64_part = url.split(",", 1)[-1] if "," in url else url
-        file_bytes = len(base64_part) * 3 // 4
-        if file_bytes < 1000:
-            return 85
-
-        pixel_est = int(file_bytes * 8 / 2.5)
-        side = int(pixel_est ** 0.5)
-        tiles_x = max(1, (side + 511) // 512)
-        tiles_y = max(1, (side + 511) // 512)
-        return tiles_x * tiles_y * 170 + 85
+        return LLMAdapter._estimate_image_tokens(item)
 
     def estimate_messages_tokens(self, messages: list[LLMMessage]) -> int:
         """
