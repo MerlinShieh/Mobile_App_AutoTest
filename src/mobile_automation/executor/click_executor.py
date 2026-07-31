@@ -6,6 +6,7 @@
 所有异常均捕获并记录日志，不向外传播。
 """
 
+import time
 from typing import Optional
 
 from ..device.device_manager import DeviceManager
@@ -80,7 +81,8 @@ class ClickExecutor:
         """
         从 Action 参数中解析点击坐标。
 
-        优先使用 ui_element（resource-id），其次使用 (x, y) 坐标。
+        注意：element_id 由 StepRunner 在 execute() 调用前解析为 (x, y)
+        坐标填入 params，本方法仅读取已解析的坐标结果，不具备解析能力。
 
         参数
         ----------
@@ -141,7 +143,8 @@ class ClickExecutor:
         """
         执行双击操作。
 
-        通过连续两次单击模拟双击行为。
+        通过连续两次单击模拟双击行为，两次点击之间间隔 0.1s，
+        确保 Android 系统将两次点击识别为独立事件（而非合并为一次）。
 
         参数
         ----------
@@ -159,6 +162,7 @@ class ClickExecutor:
         """
         try:
             u2.click(x, y)
+            time.sleep(0.1)
             u2.click(x, y)
             logger.debug("坐标双击成功: (%d, %d)", x, y)
             return True
@@ -187,7 +191,7 @@ class ClickExecutor:
             长按是否成功。
         """
         try:
-            u2._device.long_click(x, y)
+            u2.long_click(x, y)
             logger.debug("坐标长按成功: (%d, %d)", x, y)
             return True
         except Exception as exc:

@@ -204,6 +204,28 @@ class U2Controller:
             logger.error("点击坐标 (%d, %d) 失败: %s", x, y, exc)
             raise
 
+    def long_click(self, x: int, y: int, duration: float = 0.5) -> None:
+        """
+        在屏幕指定坐标处执行长按。
+
+        封装 uiautomator2 的长按接口，避免调用方直接访问内部 _device。
+
+        参数
+        ----------
+        x : int
+            长按位置的 X 坐标（像素）。
+        y : int
+            长按位置的 Y 坐标（像素）。
+        duration : float
+            长按持续时长（秒），默认 0.5 秒。
+        """
+        try:
+            self._device.long_click(x, y, duration=duration)
+            logger.debug("长按坐标 (%d, %d) 时长 %.1fs", x, y, duration)
+        except Exception as exc:
+            logger.error("长按坐标 (%d, %d) 失败: %s", x, y, exc)
+            raise
+
     def click_by_rid(self, resource_id: str) -> bool:
         """
         根据 resource-id 点击元素。

@@ -113,8 +113,9 @@ class SwipeExecutor:
 
         fx: int = cx
         fy: int = cy
-        tx: int = cx + dx
-        ty: int = cy + dy
+        # 终点坐标裁剪到屏幕有效范围内，防止超界滑动被系统忽略
+        tx: int = max(0, min(screen_w - 1, cx + dx))
+        ty: int = max(0, min(screen_h - 1, cy + dy))
 
         u2 = self._dm.get_u2()
         u2.swipe(fx, fy, tx, ty)
@@ -142,14 +143,19 @@ class SwipeExecutor:
             logger.warning("SWIPE_POINT 至少需要 2 个坐标点，当前 points=%s", points)
             return False
 
-        fx, fy = points[0]
-        tx, ty = points[-1]
-
+        # 逐段滑动：依次经过所有中间途经点，实现真正的多段轨迹
+        # （如九宫格解锁、绘制图案等场景）。仅首尾两点会退化为单段滑动。
         u2 = self._dm.get_u2()
-        u2.swipe(fx, fy, tx, ty)
-        logger.info("轨迹滑动成功: 起点(%d,%d) -> 终点(%d,%d)，途经 %d 个点",
-                     fx, fy, tx, ty, len(points))
-        return True
+        try:
+            for i in range(len(points) - 1):
+                fx, fy = points[i]
+                tx, ty = points[i + 1]
+                u2.swipe(fx, fy, tx, ty)
+            logger.info("轨迹滑动成功: %d 个点，%d 段", len(points), len(points) - 1)
+            return True
+        except Exception as exc:
+            logger.error("轨迹滑动失败: %s", exc)
+            return False
 
     SCROLL_STEPS: int = 55
     """滚动操作的滑动步数。值越小滑动越快，55 步约 0.3s，比拖拽快但比 fling 柔和。"""
@@ -194,7 +200,7 @@ class SwipeExecutor:
         dy: int = int(vector[1] * screen_h * distance_ratio)
 
         fx, fy = cx, cy
-        tx, ty = cx + dx, cy + dy
+        tx, ty = max(0, min(screen_w - 1, cx + dx)), max(0, min(screen_h - 1, cy + dy))
 
         u2 = self._dm.get_u2()
         u2.swipe(fx, fy, tx, ty, steps=self.SCROLL_STEPS)

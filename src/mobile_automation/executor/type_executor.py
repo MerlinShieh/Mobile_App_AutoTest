@@ -103,7 +103,10 @@ class TypeExecutor:
                 u2.click(x, y)
                 logger.debug("已点击目标坐标 (%d, %d) 获取焦点", x, y)
             except Exception as exc:
-                logger.warning("聚焦点击失败: (%d, %d), error=%s", x, y, exc)
+                # 聚焦失败时中止输入：继续 send_text 会把文本输入到
+                # 当前焦点控件（可能是其他应用），造成文本泄露
+                logger.error("聚焦点击失败: (%d, %d), error=%s，中止文本输入", x, y, exc)
+                return False
 
         try:
             u2.send_text(text)

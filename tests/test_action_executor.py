@@ -124,12 +124,35 @@ class TestActionExecutor:
         mocker.patch("mobile_automation.executor.action_executor.settings.coordinate_tuning.offset_y", -5)
 
         mock_dm = mocker.MagicMock()
+        mock_dm.get_screen_size.return_value = (1080, 2400)
         executor = ActionExecutor(mock_dm)
         action = Action(ActionType.CLICK, ActionParams(x=100, y=200))
 
         executor._apply_tuning(action.params)
         assert action.params.x == 110
         assert action.params.y == 195
+
+    def test_apply_tuning_clamps_to_screen(self, mocker):
+        """验证微调结果被裁剪到屏幕有效范围。"""
+        mocker.patch("mobile_automation.executor.action_executor.settings.coordinate_tuning.enable_tuning", True)
+        mocker.patch("mobile_automation.executor.action_executor.settings.coordinate_tuning.offset_x", 10)
+        mocker.patch("mobile_automation.executor.action_executor.settings.coordinate_tuning.offset_y", -5)
+
+        mock_dm = mocker.MagicMock()
+        mock_dm.get_screen_size.return_value = (1080, 2400)
+        executor = ActionExecutor(mock_dm)
+
+        # x=0 加偏移 10 -> 10 正常；y=5 减偏移 5 -> 0（裁剪到 0）
+        action = Action(ActionType.CLICK, ActionParams(x=0, y=5))
+        executor._apply_tuning(action.params)
+        assert action.params.x == 10
+        assert action.params.y == 0
+
+        # 超出屏幕边界时裁剪到 screen-1
+        action2 = Action(ActionType.CLICK, ActionParams(x=1075, y=2405))
+        executor._apply_tuning(action2.params)
+        assert action2.params.x == 1079
+        assert action2.params.y == 2399
 
     def test_execute_unknown_system_action(self, mocker):
         """验证未知系统操作返回 False。"""

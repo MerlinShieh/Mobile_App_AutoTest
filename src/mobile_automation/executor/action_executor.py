@@ -14,7 +14,7 @@ element_id 优先定位流程：
   5. 失败后回退到 (x, y) 坐标点击
 """
 
-from typing import Optional
+from typing import Callable, Optional
 
 from ..config import settings
 from ..device.device_manager import DeviceManager
@@ -142,7 +142,7 @@ class ActionExecutor:
         try:
             u2 = self._dm.get_u2()
             adb = self._dm.get_adb()
-            system_actions: dict[ActionType, callable] = {
+            system_actions: dict[ActionType, Callable] = {
                 ActionType.BACK: u2.press_back,
                 ActionType.HOME: u2.press_home,
                 ActionType.RECENT_APPS: u2.press_recent,
@@ -200,25 +200,26 @@ class ActionExecutor:
             raise ValueError(f"无效的旋转方向: {direction}，有效值: {list(mapping.keys())}")
         return mapping[direction]
 
-    @staticmethod
-    def _apply_tuning(params: ActionParams) -> None:
+    def _apply_tuning(self, params: ActionParams) -> None:
         """
         对坐标参数应用微调偏移。
 
-        当 enable_tuning 启用时，对 (x, y) 坐标分别加上配置的偏移量。
+        当 enable_tuning 启用时，对 (x, y) 坐标分别加上配置的偏移量，
+        并将结果裁剪到屏幕有效范围内（防止负坐标或超出屏幕）。
 
         参数
         ----------
         params : ActionParams
             待微调的操作参数，会直接修改其中的 x, y 值。
         """
+        screen_w, screen_h = self._dm.get_screen_size()
         if params.x is not None:
             old_x: int = params.x
-            params.x += settings.coordinate_tuning.offset_x
+            params.x = max(0, min(screen_w - 1, params.x + settings.coordinate_tuning.offset_x))
             logger.debug("坐标微调 X: %d -> %d (offset=%d)", old_x, params.x, settings.coordinate_tuning.offset_x)
         if params.y is not None:
             old_y: int = params.y
-            params.y += settings.coordinate_tuning.offset_y
+            params.y = max(0, min(screen_h - 1, params.y + settings.coordinate_tuning.offset_y))
             logger.debug("坐标微调 Y: %d -> %d (offset=%d)", old_y, params.y, settings.coordinate_tuning.offset_y)
 
     def _capture_screenshot(self) -> None:
