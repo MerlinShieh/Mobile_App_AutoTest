@@ -71,7 +71,8 @@ class LLMServiceFactory:
                 f"不支持的 LLM 提供商: {provider}，可选: {list(cls._adapters.keys())}"
             )
         logger.info("LLMServiceFactory 创建 Adapter: provider=%s, cls=%s", provider, adapter_cls.__name__)
-        return adapter_cls()
+        # 将 provider 名称传给适配器，供其从 settings.models.providers 读取配置
+        return adapter_cls(provider=provider)
 
     @classmethod
     def register(cls, name: str, adapter_cls: type[LLMAdapter]) -> None:

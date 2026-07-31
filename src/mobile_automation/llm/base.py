@@ -49,6 +49,14 @@ class LLMAdapter(ABC):
     ...         return "response"
     """
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """
+        基类构造函数（空实现）。
+
+        具体适配器覆盖此方法并按需接收 provider 等参数，
+        工厂统一以 adapter_cls(provider=provider) 方式创建。
+        """
+
     @abstractmethod
     def chat(self, messages: list[LLMMessage], **kwargs) -> str:
         """

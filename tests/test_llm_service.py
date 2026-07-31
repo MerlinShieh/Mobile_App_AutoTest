@@ -15,28 +15,28 @@ class TestLLMServiceFactory:
     def test_create_qwen_adapter(self, mocker):
         """验证创建 qwen 适配器。"""
         mock_adapter = mocker.MagicMock(spec=LLMAdapter)
-        mocker.patch.object(LLMServiceFactory, "_adapters", {"qwen": lambda: mock_adapter})
+        mocker.patch.object(LLMServiceFactory, "_adapters", {"qwen": lambda provider=None: mock_adapter})
         adapter = LLMServiceFactory.create("qwen")
         assert adapter == mock_adapter
 
     def test_create_openai_adapter(self, mocker):
         """验证创建 openai 适配器。"""
         mock_adapter = mocker.MagicMock(spec=LLMAdapter)
-        mocker.patch.object(LLMServiceFactory, "_adapters", {"openai": lambda: mock_adapter})
+        mocker.patch.object(LLMServiceFactory, "_adapters", {"openai": lambda provider=None: mock_adapter})
         adapter = LLMServiceFactory.create("openai")
         assert adapter == mock_adapter
 
     def test_create_anthropic_adapter(self, mocker):
         """验证创建 anthropic 适配器。"""
         mock_adapter = mocker.MagicMock(spec=LLMAdapter)
-        mocker.patch.object(LLMServiceFactory, "_adapters", {"anthropic": lambda: mock_adapter})
+        mocker.patch.object(LLMServiceFactory, "_adapters", {"anthropic": lambda provider=None: mock_adapter})
         adapter = LLMServiceFactory.create("anthropic")
         assert adapter == mock_adapter
 
     def test_create_mimo_adapter(self, mocker):
         """验证创建 mimo 适配器。"""
         mock_adapter = mocker.MagicMock(spec=LLMAdapter)
-        mocker.patch.object(LLMServiceFactory, "_adapters", {"mimo": lambda: mock_adapter})
+        mocker.patch.object(LLMServiceFactory, "_adapters", {"mimo": lambda provider=None: mock_adapter})
         adapter = LLMServiceFactory.create("mimo")
         assert adapter == mock_adapter
 
@@ -48,10 +48,21 @@ class TestLLMServiceFactory:
     def test_create_with_none_uses_settings(self, mocker):
         """验证 provider=None 时使用配置的默认值。"""
         mock_adapter = mocker.MagicMock(spec=LLMAdapter)
-        mocker.patch.object(LLMServiceFactory, "_adapters", {"qwen": lambda: mock_adapter})
+        mocker.patch.object(LLMServiceFactory, "_adapters", {"qwen": lambda provider=None: mock_adapter})
         mocker.patch("mobile_automation.llm.llm_service.settings.llm.provider", "qwen")
         adapter = LLMServiceFactory.create()
         assert adapter == mock_adapter
+
+    def test_create_passes_provider_to_adapter(self, mocker):
+        """验证工厂将 provider 名称传给适配器。"""
+        mock_adapter = mocker.MagicMock(spec=LLMAdapter)
+        seen = {}
+        def fake_factory(provider=None):
+            seen["provider"] = provider
+            return mock_adapter
+        mocker.patch.object(LLMServiceFactory, "_adapters", {"qwen": fake_factory})
+        LLMServiceFactory.create("qwen")
+        assert seen.get("provider") == "qwen"
 
     def test_register_custom_adapter(self, mocker):
         """验证注册自定义 Adapter。"""

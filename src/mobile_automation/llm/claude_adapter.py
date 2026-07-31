@@ -39,20 +39,39 @@ class ClaudeAdapter(LLMAdapter):
         self,
         api_key: Optional[str] = None,
         model_name: Optional[str] = None,
+        provider: Optional[str] = None,
     ) -> None:
         """
         初始化 ClaudeAdapter。
 
+        优先从 settings.models.providers["anthropic"] 读取配置（多模型架构），
+        未配置时回退到 settings.llm（向后兼容旧架构）。
+
         参数
         ----------
         api_key : Optional[str]
-            Anthropic API 密钥，未传入时从 settings.llm.api_key 读取。
+            Anthropic API 密钥，未传入时从配置读取。
         model_name : Optional[str]
-            模型名称，未传入时从 settings.llm.model_name 读取，
+            模型名称，未传入时从配置读取，
             默认值为 "claude-3-5-sonnet-20241022"。
+        provider : Optional[str]
+            提供商名称，默认 "anthropic"。
         """
-        self._api_key: str = api_key or settings.llm.api_key
-        self._model: str = model_name or settings.llm.model_name or "claude-3-5-sonnet-20241022"
+        provider_name = provider or "anthropic"
+        provider_cfg = settings.models.providers.get(provider_name)
+
+        if provider_cfg:
+            self._api_key: str = api_key or provider_cfg.api_key
+            # 从模型注册表查找本 provider 的第一个模型
+            self._model: str = model_name or ""
+            for model_entry in settings.models.models.values():
+                if model_entry.provider == provider_name:
+                    self._model = self._model or model_entry.model_name
+                    break
+            self._model = self._model or "claude-3-5-sonnet-20241022"
+        else:
+            self._api_key = api_key or settings.llm.api_key
+            self._model = model_name or settings.llm.model_name or "claude-3-5-sonnet-20241022"
 
         if not self._api_key:
             raise ValueError(

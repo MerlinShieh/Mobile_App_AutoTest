@@ -40,25 +40,48 @@ class QwenAdapter(LLMAdapter):
         base_url: Optional[str] = None,
         model_name: Optional[str] = None,
         context_window: Optional[int] = None,
+        provider: Optional[str] = None,
     ) -> None:
         """
         初始化 QwenAdapter。
 
+        优先从 settings.models.providers["qwen"] 读取配置（多模型架构），
+        未配置时回退到 settings.llm（向后兼容旧架构）。
+
         参数
         ----------
         api_key : Optional[str]
-            DashScope API 密钥，未传入时从 settings.llm.api_key 读取。
+            DashScope API 密钥，未传入时从配置读取。
         base_url : Optional[str]
-            API 请求基础地址，未传入时从 settings.llm.base_url 读取。
+            API 请求基础地址，未传入时从配置读取。
         model_name : Optional[str]
-            模型名称，未传入时从 settings.llm.model_name 读取。
+            模型名称，未传入时从配置读取。
         context_window : Optional[int]
-            上下文窗口大小，未传入时默认为 32000。
+            上下文窗口大小，未传入时从配置读取。
+        provider : Optional[str]
+            提供商名称，默认 "qwen"。
         """
-        self._api_key: str = api_key or settings.llm.api_key
-        self._base_url: str = base_url or settings.llm.base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1"
-        self._model: str = model_name or settings.llm.model_name or "qwen-vl-max"
-        self._context_window: int = context_window or getattr(settings.llm, "context_window", self.CONTEXT_WINDOW_DEFAULT)
+        provider_name = provider or "qwen"
+        provider_cfg = settings.models.providers.get(provider_name)
+
+        if provider_cfg:
+            self._api_key: str = api_key or provider_cfg.api_key
+            self._base_url: str = base_url or provider_cfg.base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            # 从模型注册表查找本 provider 的第一个模型
+            self._model: str = model_name or ""
+            self._context_window: int = context_window or 0
+            for model_entry in settings.models.models.values():
+                if model_entry.provider == provider_name:
+                    self._model = self._model or model_entry.model_name
+                    self._context_window = self._context_window or model_entry.context_window
+                    break
+            self._model = self._model or "qwen-vl-max"
+            self._context_window = self._context_window or self.CONTEXT_WINDOW_DEFAULT
+        else:
+            self._api_key = api_key or settings.llm.api_key
+            self._base_url = base_url or settings.llm.base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            self._model = model_name or settings.llm.model_name or "qwen-vl-max"
+            self._context_window = context_window or getattr(settings.llm, "context_window", self.CONTEXT_WINDOW_DEFAULT)
 
         if not self._api_key:
             raise ValueError(
