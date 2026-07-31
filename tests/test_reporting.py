@@ -27,11 +27,28 @@ class TestDataArchiver:
             assert archiver.base_dir.exists()
             assert archiver.base_dir.name == "test001"
 
+    def test_task_id_with_invalid_chars_sanitized(self):
+        """验证非法字符 task_id 被清洗，归档目录仍可创建。"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            archiver = DataArchiver(task_id="task:01/02\\03?*", report_dir=tmpdir)
+            assert archiver.base_dir.exists()
+            assert ":" not in archiver.base_dir.name
+            assert "/" not in archiver.base_dir.name
+            assert "\\" not in archiver.base_dir.name
+
+    def test_task_id_empty_fallback(self):
+        """验证空 task_id 回退为默认名。"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            archiver = DataArchiver(task_id="///", report_dir=tmpdir)
+            assert archiver.base_dir.exists()
+            assert archiver.base_dir.name == "task"
+
     def test_save_screenshot(self):
         """验证截图文件保存。"""
         with tempfile.TemporaryDirectory() as tmpdir:
             archiver = DataArchiver(task_id="test001", report_dir=tmpdir)
             path = archiver.save_screenshot(1, b"fake_image_bytes")
+            assert path is not None
             assert path.exists()
             assert path.name == "screenshot.png"
             assert path.read_bytes() == b"fake_image_bytes"
@@ -41,6 +58,7 @@ class TestDataArchiver:
         with tempfile.TemporaryDirectory() as tmpdir:
             archiver = DataArchiver(task_id="test001", report_dir=tmpdir)
             path = archiver.save_screenshot(1, b"after_bytes", after=True)
+            assert path is not None
             assert path.exists()
             assert path.name == "screenshot_after.png"
 
@@ -50,6 +68,7 @@ class TestDataArchiver:
             archiver = DataArchiver(task_id="test001", report_dir=tmpdir)
             xml = '<node text="测试"/>'
             path = archiver.save_raw_xml(1, xml)
+            assert path is not None
             assert path.exists()
             assert path.read_text(encoding="utf-8") == xml
 
@@ -59,6 +78,7 @@ class TestDataArchiver:
             archiver = DataArchiver(task_id="test001", report_dir=tmpdir)
             summary = "#1 [可点] 设置"
             path = archiver.save_structured_summary(1, summary)
+            assert path is not None
             assert path.exists()
             assert path.read_text(encoding="utf-8") == summary
 
@@ -68,6 +88,7 @@ class TestDataArchiver:
             archiver = DataArchiver(task_id="test001", report_dir=tmpdir)
             messages = [{"role": "user", "content": "你好"}]
             path = archiver.save_llm_request(1, messages)
+            assert path is not None
             assert path.exists()
             loaded = json.loads(path.read_text(encoding="utf-8"))
             assert loaded[0]["role"] == "user"
@@ -81,6 +102,7 @@ class TestDataArchiver:
                 {"type": "image_url", "image_url": {"url": f"data:image;base64,{long_b64}"}},
             ]}]
             path = archiver.save_llm_request(1, messages)
+            assert path is not None
             loaded = json.loads(path.read_text(encoding="utf-8"))
             url = loaded[0]["content"][0]["image_url"]["url"]
             assert len(url) < 500
@@ -91,6 +113,7 @@ class TestDataArchiver:
         with tempfile.TemporaryDirectory() as tmpdir:
             archiver = DataArchiver(task_id="test001", report_dir=tmpdir)
             path = archiver.save_llm_response(1, '{"action_type": "click"}')
+            assert path is not None
             assert path.exists()
             loaded = json.loads(path.read_text(encoding="utf-8"))
             assert "response" in loaded

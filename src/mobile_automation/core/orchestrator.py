@@ -179,19 +179,25 @@ class TaskOrchestrator:
             context.status = TaskStatus.COMPLETED
             logger.info("任务 %s 正常完成，共执行 %d 步", context.task_id, context.current_step)
 
-        archiver.save_task_meta({
-            "task_id": context.task_id,
-            "user_goal": context.user_goal,
-            "status": context.status.value,
-            "steps": len(context.steps),
-            "success_rate": context.get_success_rate(),
-            "total_tokens": context.total_tokens_used,
-            "created_at": str(context.created_at),
-        })
+        try:
+            archiver.save_task_meta({
+                "task_id": context.task_id,
+                "user_goal": context.user_goal,
+                "status": context.status.value,
+                "steps": len(context.steps),
+                "success_rate": context.get_success_rate(),
+                "total_tokens": context.total_tokens_used,
+                "created_at": str(context.created_at),
+            })
+        except OSError as exc:
+            logger.warning("任务 %s 元数据保存失败（不影响任务结果）: %s", context.task_id, exc)
 
         report_generator = ReportGenerator(context, archiver)
-        report_path = report_generator.generate()
-        logger.info("任务 %s 报告已生成: %s", context.task_id, report_path)
+        try:
+            report_path = report_generator.generate()
+            logger.info("任务 %s 报告已生成: %s", context.task_id, report_path)
+        except OSError as exc:
+            logger.warning("任务 %s 报告生成失败（不影响任务结果）: %s", context.task_id, exc)
 
         logger.info("任务 %s 结束: status=%s, steps=%d, tokens=%d",
                      context.task_id, context.status.value, context.current_step, context.total_tokens_used)
