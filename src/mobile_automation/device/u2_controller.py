@@ -12,6 +12,7 @@ from typing import Optional
 import uiautomator2 as u2
 from PIL import Image
 
+from ..config import settings
 from ..logger import get_logger
 
 logger = get_logger(__name__)
@@ -107,6 +108,9 @@ class U2Controller:
         """
         获取屏幕宽高。
 
+        获取失败时回退到配置的默认屏幕尺寸（settings.device），
+        不再硬编码 1080x1920，保证非标准设备可用。
+
         返回
         -------
         tuple[int, int]
@@ -117,8 +121,13 @@ class U2Controller:
             logger.debug("屏幕尺寸: %dx%d", w, h)
             return w, h
         except Exception as exc:
-            logger.error("获取屏幕尺寸失败: %s", exc)
-            return 1080, 1920
+            fallback = (
+                settings.device.default_screen_width,
+                settings.device.default_screen_height,
+            )
+            logger.warning("获取屏幕尺寸失败，使用配置默认值 %dx%d: %s",
+                           fallback[0], fallback[1], exc)
+            return fallback
 
     def get_device_info(self) -> dict:
         """
@@ -471,6 +480,9 @@ class U2Controller:
         """
         等待页面 UI 树稳定（连续两次 dump 内容一致）。
 
+        dump 异常时重置 prev_dump 为 None，避免基于过期快照误判页面
+        稳定；连续失败超过阈值（3 次）提前终止，避免设备断连时空转。
+
         参数
         ----------
         timeout_ms : int
@@ -479,23 +491,34 @@ class U2Controller:
         返回
         -------
         bool
-            True 表示在超时前页面已稳定，False 表示超时。
+            True 表示在超时前页面已稳定，False 表示超时或连续失败。
         """
         import time
 
         deadline = time.time() + timeout_ms / 1000.0
         prev_dump: Optional[str] = None
         sleep_interval = 0.5
+        consecutive_failures = 0
+        max_consecutive_failures = 3
 
         while time.time() < deadline:
             try:
                 current_dump = self.dump_ui()
+                consecutive_failures = 0
                 if prev_dump is not None and current_dump == prev_dump:
                     logger.debug("页面已稳定，耗时: %.1f 秒", time.time() - (deadline - timeout_ms / 1000.0))
                     return True
                 prev_dump = current_dump
             except Exception as exc:
-                logger.warning("等待稳定期间 UI dump 失败: %s", exc)
+                # 连续失败时重置快照，防止用旧快照误判稳定
+                prev_dump = None
+                consecutive_failures += 1
+                logger.warning("等待稳定期间 UI dump 失败 (%d/%d): %s",
+                               consecutive_failures, max_consecutive_failures, exc)
+                if consecutive_failures >= max_consecutive_failures:
+                    logger.error("等待稳定期间连续 %d 次 dump 失败，设备可能已断连，提前终止",
+                                 max_consecutive_failures)
+                    return False
             time.sleep(sleep_interval)
 
         logger.warning("等待页面稳定超时 (%d ms)", timeout_ms)

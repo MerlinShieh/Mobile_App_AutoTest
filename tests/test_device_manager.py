@@ -50,6 +50,31 @@ class TestU2ControllerConnectTimeout:
             U2Controller._connect_with_timeout("test-device", timeout=5.0)
 
 
+class TestU2ControllerWindowSize:
+    """测试 U2Controller 屏幕尺寸获取。"""
+
+    def test_window_size_fallback_to_config(self, mocker):
+        """验证获取失败时回退到配置默认值而非硬编码。"""
+        mock_device = mocker.MagicMock()
+        mock_device.window_size.side_effect = RuntimeError("device offline")
+        mocker.patch("mobile_automation.device.u2_controller.u2.connect", return_value=mock_device)
+        mocker.patch("mobile_automation.device.u2_controller.settings.device.default_screen_width", 800)
+        mocker.patch("mobile_automation.device.u2_controller.settings.device.default_screen_height", 1280)
+
+        controller = U2Controller("test-device")
+        w, h = controller.window_size()
+        assert (w, h) == (800, 1280)
+
+    def test_window_size_success(self, mocker):
+        """验证正常获取屏幕尺寸。"""
+        mock_device = mocker.MagicMock()
+        mock_device.window_size.return_value = (1080, 2400)
+        mocker.patch("mobile_automation.device.u2_controller.u2.connect", return_value=mock_device)
+
+        controller = U2Controller("test-device")
+        assert controller.window_size() == (1080, 2400)
+
+
 class TestDeviceManager:
     """测试 DeviceManager 的设备管理功能。"""
 
