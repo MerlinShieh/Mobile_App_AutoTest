@@ -7,9 +7,10 @@
 
 from typing import Any, Optional
 
-from openai import OpenAI
+from openai import APIError, OpenAI
 
 from ..config import settings
+from ..exception import LLMServiceError
 from ..logger import get_logger
 from .base import LLMAdapter, LLMMessage
 
@@ -58,6 +59,12 @@ class QwenAdapter(LLMAdapter):
         self._base_url: str = base_url or settings.llm.base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1"
         self._model: str = model_name or settings.llm.model_name or "qwen-vl-max"
         self._context_window: int = context_window or getattr(settings.llm, "context_window", self.CONTEXT_WINDOW_DEFAULT)
+
+        if not self._api_key:
+            raise ValueError(
+                "Qwen API Key 未配置。请在 .env 中设置 LLM_API_KEY 或 "
+                "MODELS__PROVIDERS__QWEN__API_KEY。"
+            )
 
         logger.info("QwenAdapter 初始化: model=%s, base_url=%s", self._model, self._base_url)
 
@@ -113,13 +120,23 @@ class QwenAdapter(LLMAdapter):
 
         logger.debug("QwenAdapter.chat 发送消息: %d 条, model=%s", len(openai_messages), self._model)
 
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=openai_messages,
-            max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
-            temperature=kwargs.get("temperature", settings.llm.temperature),
-            timeout=kwargs.get("timeout", settings.llm.request_timeout),
-        )
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=openai_messages,
+                max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
+                temperature=kwargs.get("temperature", settings.llm.temperature),
+                timeout=kwargs.get("timeout", settings.llm.request_timeout),
+            )
+        except APIError as exc:
+            logger.error("Qwen API 调用失败: %s", exc)
+            raise LLMServiceError(f"Qwen API 调用失败: {exc}", provider="qwen") from exc
+        except Exception as exc:
+            logger.error("Qwen 调用发生未知异常: %s", exc)
+            raise LLMServiceError(f"Qwen 调用异常: {exc}", provider="qwen") from exc
+
+        if not response.choices:
+            raise LLMServiceError("Qwen API 返回空响应（无 choices）", provider="qwen")
 
         result: str = response.choices[0].message.content or ""
         logger.debug("QwenAdapter.chat 收到回复: %d 字符", len(result))

@@ -7,9 +7,10 @@ MiMo API 完全兼容 OpenAI 协议，使用 OpenAI SDK 即可对接。
 
 from typing import Any, Optional
 
-from openai import OpenAI
+from openai import APIError, OpenAI
 
 from ..config import settings
+from ..exception import LLMServiceError
 from ..logger import get_logger
 from .base import LLMAdapter, LLMMessage
 
@@ -65,6 +66,12 @@ class MiMoAdapter(LLMAdapter):
                 self._context_window = model_entry.context_window or self._context_window
                 break
 
+        if not self._api_key:
+            raise ValueError(
+                "MiMo API Key 未配置。请在 .env 中设置 LLM_API_KEY 或 "
+                "MODELS__PROVIDERS__MIMO__API_KEY。"
+            )
+
         logger.info("MiMoAdapter 初始化: model=%s, base_url=%s", self._model, self._base_url)
 
         self._client: OpenAI = OpenAI(
@@ -105,13 +112,23 @@ class MiMoAdapter(LLMAdapter):
 
         logger.debug("MiMoAdapter.chat 发送消息: %d 条, model=%s", len(openai_messages), self._model)
 
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=openai_messages,
-            max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
-            temperature=kwargs.get("temperature", settings.llm.temperature),
-            timeout=kwargs.get("timeout", settings.llm.request_timeout),
-        )
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=openai_messages,
+                max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
+                temperature=kwargs.get("temperature", settings.llm.temperature),
+                timeout=kwargs.get("timeout", settings.llm.request_timeout),
+            )
+        except APIError as exc:
+            logger.error("MiMo API 调用失败: %s", exc)
+            raise LLMServiceError(f"MiMo API 调用失败: {exc}", provider="mimo") from exc
+        except Exception as exc:
+            logger.error("MiMo 调用发生未知异常: %s", exc)
+            raise LLMServiceError(f"MiMo 调用异常: {exc}", provider="mimo") from exc
+
+        if not response.choices:
+            raise LLMServiceError("MiMo API 返回空响应（无 choices）", provider="mimo")
 
         message = response.choices[0].message
         content: str = message.content or ""

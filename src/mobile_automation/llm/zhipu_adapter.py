@@ -7,9 +7,10 @@
 
 from typing import Any, Optional
 
-from openai import OpenAI
+from openai import APIError, OpenAI
 
 from ..config import settings
+from ..exception import LLMServiceError
 from ..logger import get_logger
 from .base import LLMAdapter, LLMMessage
 
@@ -54,6 +55,12 @@ class ZhipuAdapter(LLMAdapter):
         self._api_key: str = api_key or settings.llm.api_key
         self._base_url: str = base_url or settings.llm.base_url or "https://open.bigmodel.cn/api/paas/v4/"
         self._model: str = model_name or settings.llm.model_name or "glm-4.1v-thinking-flash"
+
+        if not self._api_key:
+            raise ValueError(
+                "智谱 API Key 未配置。请在 .env 中设置 LLM_API_KEY 或 "
+                "MODELS__PROVIDERS__ZHIPU__API_KEY。"
+            )
 
         logger.info("ZhipuAdapter 初始化: model=%s, base_url=%s", self._model, self._base_url)
 
@@ -104,13 +111,23 @@ class ZhipuAdapter(LLMAdapter):
 
         logger.debug("ZhipuAdapter.chat 发送消息: %d 条, model=%s", len(openai_messages), self._model)
 
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=openai_messages,
-            max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
-            temperature=kwargs.get("temperature", settings.llm.temperature),
-            timeout=kwargs.get("timeout", settings.llm.request_timeout),
-        )
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=openai_messages,
+                max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
+                temperature=kwargs.get("temperature", settings.llm.temperature),
+                timeout=kwargs.get("timeout", settings.llm.request_timeout),
+            )
+        except APIError as exc:
+            logger.error("智谱 API 调用失败: %s", exc)
+            raise LLMServiceError(f"智谱 API 调用失败: {exc}", provider="zhipu") from exc
+        except Exception as exc:
+            logger.error("智谱调用发生未知异常: %s", exc)
+            raise LLMServiceError(f"智谱调用异常: {exc}", provider="zhipu") from exc
+
+        if not response.choices:
+            raise LLMServiceError("智谱 API 返回空响应（无 choices）", provider="zhipu")
 
         result: str = response.choices[0].message.content or ""
         logger.debug("ZhipuAdapter.chat 收到回复: %d 字符", len(result))

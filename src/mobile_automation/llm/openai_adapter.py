@@ -7,9 +7,10 @@ OpenAI GPT-4o 适配器 —— 调用 OpenAI 标准 API。
 
 from typing import Any, Optional
 
-from openai import OpenAI
+from openai import APIError, OpenAI
 
 from ..config import settings
+from ..exception import LLMServiceError
 from ..logger import get_logger
 from .base import LLMAdapter, LLMMessage
 
@@ -121,12 +122,25 @@ class OpenAIAdapter(LLMAdapter):
 
         logger.debug("OpenAIAdapter.chat 发送消息: %d 条, model=%s", len(openai_messages), self._model)
 
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=openai_messages,
-            max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
-            temperature=kwargs.get("temperature", settings.llm.temperature),
-        )
+        # 注意：不校验 API Key 空值——local provider（本地 llama-server）
+        # 复用本适配器且无需认证，空 Key 是合法场景。
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=openai_messages,
+                max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
+                temperature=kwargs.get("temperature", settings.llm.temperature),
+                timeout=kwargs.get("timeout", settings.llm.request_timeout),
+            )
+        except APIError as exc:
+            logger.error("OpenAI API 调用失败: %s", exc)
+            raise LLMServiceError(f"OpenAI API 调用失败: {exc}", provider="openai") from exc
+        except Exception as exc:
+            logger.error("OpenAI 调用发生未知异常: %s", exc)
+            raise LLMServiceError(f"OpenAI 调用异常: {exc}", provider="openai") from exc
+
+        if not response.choices:
+            raise LLMServiceError("OpenAI API 返回空响应（无 choices）", provider="openai")
 
         result: str = response.choices[0].message.content or ""
         logger.debug("OpenAIAdapter.chat 收到回复: %d 字符", len(result))

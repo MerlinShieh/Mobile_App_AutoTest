@@ -23,8 +23,27 @@ _imports_to_mock = {
     "cv2": MagicMock(),
     "numpy": MagicMock(),
 }
+
+# 为 openai/anthropic 注入真实的异常类（安装则用真实类，否则用虚拟子类），
+# 否则适配器中 `except APIError` 会因捕获 MagicMock 类而抛 TypeError
+try:
+    from openai import APIError as _openai_api_error_cls
+except ImportError:  # pragma: no cover
+    class _openai_api_error_cls(Exception):  # type: ignore[no-redef]
+        """openai 未安装时的虚拟异常类。"""
+
+try:
+    from anthropic import APIError as _anthropic_api_error_cls
+except ImportError:  # pragma: no cover
+    class _anthropic_api_error_cls(Exception):  # type: ignore[no-redef]
+        """anthropic 未安装时的虚拟异常类。"""
+
 for _mod_name, _mod_val in _imports_to_mock.items():
     if _mod_name not in sys.modules:
+        if _mod_name == "openai":
+            _mod_val.APIError = _openai_api_error_cls
+        elif _mod_name == "anthropic":
+            _mod_val.APIError = _anthropic_api_error_cls
         sys.modules[_mod_name] = _mod_val
 
 from mobile_automation.models.action import Action, ActionParams

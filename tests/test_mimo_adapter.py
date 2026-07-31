@@ -6,6 +6,7 @@
 
 import pytest
 
+from mobile_automation.exception import LLMServiceError
 from mobile_automation.llm.base import LLMMessage
 from mobile_automation.llm.mimo_adapter import MiMoAdapter
 
@@ -37,6 +38,18 @@ class TestMiMoAdapterInit:
         adapter = MiMoAdapter()
         assert adapter._api_key == "fallback-key"
         assert adapter._base_url == "https://fallback.com/v1"
+
+    def test_init_missing_api_key_raises(self, mocker):
+        """验证 API Key 为空时初始化抛出 ValueError。"""
+        mocker.patch("mobile_automation.llm.mimo_adapter.settings.models.providers", {
+            "mimo": mocker.MagicMock(api_key="", base_url="https://api.xiaomimimo.com/v1"),
+        })
+        mocker.patch("mobile_automation.llm.mimo_adapter.settings.models.models", {
+            "mimo-omni": mocker.MagicMock(provider="mimo", model_name="mimo-v2.5", context_window=128000),
+        })
+        mocker.patch("mobile_automation.llm.mimo_adapter.OpenAI")
+        with pytest.raises(ValueError, match="API Key"):
+            MiMoAdapter()
 
 
 class TestMiMoAdapterChat:
@@ -112,6 +125,32 @@ class TestMiMoAdapterChat:
         ])]
         result = adapter.chat(messages)
         assert result == "green"
+
+    def test_chat_api_error_wrapped(self, mocker):
+        """验证 openai APIError 被包装为 LLMServiceError。
+
+        conftest 为 mock 的 openai 模块注入了真实/虚拟 APIError 类，
+        因此可以在此构造 APIError 实例触发适配器的特定捕获分支。
+        """
+        from openai import APIError
+
+        adapter, mock_openai = self._make_adapter(mocker)
+        mock_openai.return_value.chat.completions.create.side_effect = APIError(
+            "connection timeout", request=None, body=None
+        )
+
+        messages = [LLMMessage(role="user", content="hi")]
+        with pytest.raises(LLMServiceError, match="MiMo API 调用失败"):
+            adapter.chat(messages)
+
+    def test_chat_empty_choices_raises(self, mocker):
+        """验证 API 返回空 choices 时抛出 LLMServiceError。"""
+        adapter, mock_openai = self._make_adapter(mocker)
+        mock_openai.return_value.chat.completions.create.return_value = mocker.MagicMock(choices=[])
+
+        messages = [LLMMessage(role="user", content="hi")]
+        with pytest.raises(LLMServiceError, match="空响应"):
+            adapter.chat(messages)
 
 
 class TestMiMoAdapterCountTokens:

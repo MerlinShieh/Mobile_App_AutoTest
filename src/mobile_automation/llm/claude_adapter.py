@@ -7,9 +7,10 @@ Anthropic Claude 适配器 —— 调用 Anthropic Messages API。
 
 from typing import Any, Optional
 
-from anthropic import Anthropic
+from anthropic import Anthropic, APIError as AnthropicAPIError
 
 from ..config import settings
+from ..exception import LLMServiceError
 from ..logger import get_logger
 from .base import LLMAdapter, LLMMessage
 
@@ -52,6 +53,12 @@ class ClaudeAdapter(LLMAdapter):
         """
         self._api_key: str = api_key or settings.llm.api_key
         self._model: str = model_name or settings.llm.model_name or "claude-3-5-sonnet-20241022"
+
+        if not self._api_key:
+            raise ValueError(
+                "Anthropic API Key 未配置。请在 .env 中设置 LLM_API_KEY 或 "
+                "MODELS__PROVIDERS__ANTHROPIC__API_KEY。"
+            )
 
         logger.info("ClaudeAdapter 初始化: model=%s", self._model)
 
@@ -114,13 +121,21 @@ class ClaudeAdapter(LLMAdapter):
             len(chat_messages), len(system_content), self._model,
         )
 
-        response = self._client.messages.create(
-            model=self._model,
-            system=system_content or None,
-            messages=chat_messages,
-            max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
-            temperature=kwargs.get("temperature", settings.llm.temperature),
-        )
+        try:
+            response = self._client.messages.create(
+                model=self._model,
+                system=system_content or None,
+                messages=chat_messages,
+                max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
+                temperature=kwargs.get("temperature", settings.llm.temperature),
+                timeout=kwargs.get("timeout", settings.llm.request_timeout),
+            )
+        except AnthropicAPIError as exc:
+            logger.error("Claude API 调用失败: %s", exc)
+            raise LLMServiceError(f"Claude API 调用失败: {exc}", provider="anthropic") from exc
+        except Exception as exc:
+            logger.error("Claude 调用发生未知异常: %s", exc)
+            raise LLMServiceError(f"Claude 调用异常: {exc}", provider="anthropic") from exc
 
         result: str = response.content[0].text if response.content else ""
         logger.debug("ClaudeAdapter.chat 收到回复: %d 字符", len(result))
