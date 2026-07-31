@@ -204,6 +204,11 @@ class PopupHandler:
             覆盖层节点列表。
         """
         screen_w, screen_h = self._dm.get_screen_size()
+        # 防御：get_screen_size 返回 (0,0) 时（设备未连接/ADB 失败），
+        # screen_area=0 会导致所有非零面积节点被误判为覆盖层（弹窗误报死循环根因）。
+        if screen_w <= 0 or screen_h <= 0:
+            logger.warning("弹窗覆盖层检测跳过: 屏幕尺寸无效 (%d x %d)", screen_w, screen_h)
+            return []
         screen_area: int = screen_w * screen_h
         return [
             n for n in tree.local_index.values()

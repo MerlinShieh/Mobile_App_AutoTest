@@ -51,6 +51,17 @@ class TestPopupHandlerDetect:
         assert result.detected is True
         assert result.confidence == 0.7
 
+    def test_detect_overlay_skipped_when_screen_size_invalid(self, mocker):
+        """验证屏幕尺寸无效 (0,0) 时覆盖层检测跳过，避免弹窗误报。"""
+        mock_dm = mocker.MagicMock()
+        mock_dm.get_screen_size.return_value = (0, 0)
+        root = UINode()
+        node = UINode(element_id="#1", bounds=(0, 0, 1080, 2400), clickable=True)
+        tree = UITree(root=root, local_index={"#1": node})
+        handler = PopupHandler(mock_dm)
+        result = handler.detect(tree)
+        assert result is None
+
     def test_detect_feature_text(self, mocker):
         """验证特征文本检测命中（需 ≥2 种不同文本，模拟真实弹窗的"确定"+"取消"）。"""
         mock_dm = mocker.MagicMock()
