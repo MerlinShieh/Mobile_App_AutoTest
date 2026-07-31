@@ -6,6 +6,7 @@ uiautomator2 控制器封装模块。
 """
 
 import io
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from typing import Optional
 
 import uiautomator2 as u2
@@ -14,6 +15,9 @@ from PIL import Image
 from ..logger import get_logger
 
 logger = get_logger(__name__)
+
+CONNECT_TIMEOUT_SECONDS: float = 30.0
+"""u2.connect 连接超时时间（秒），超时后由守护线程接管，主流程不再阻塞。"""
 
 
 class U2Controller:
@@ -31,11 +35,52 @@ class U2Controller:
 
     def __init__(self, serial: str) -> None:
         self._serial: str = serial
-        self._device: u2.Device = u2.connect(serial)
+        self._device: u2.Device = self._connect_with_timeout(serial)
         info = self._device.info
         if info is None:
             raise RuntimeError(f"uiautomator2 连接失败，设备序列号: {serial}")
         logger.info("U2Controller 初始化成功，设备: %s", serial)
+
+    @staticmethod
+    def _connect_with_timeout(
+        serial: str,
+        timeout: float = CONNECT_TIMEOUT_SECONDS,
+    ) -> u2.Device:
+        """
+        带超时保护的 u2.connect 连接。
+
+        设备不可达时 u2.connect 可能长时间阻塞，通过线程池 + 超时
+        保证主流程在 timeout 秒内返回。超时后底层线程作为守护线程
+        继续运行（shutdown(wait=False)），不阻塞也不泄漏到主流程。
+
+        参数
+        ----------
+        serial : str
+            目标设备的序列号。
+        timeout : float
+            连接超时秒数，默认 30s。
+
+        返回
+        -------
+        u2.Device
+            连接成功的设备对象。
+
+        抛出
+        ------
+        TimeoutError
+            连接超时（内置 concurrent.futures.TimeoutError）。
+        """
+        executor = ThreadPoolExecutor(max_workers=1)
+        try:
+            future = executor.submit(u2.connect, serial)
+            try:
+                return future.result(timeout=timeout)
+            except FutureTimeoutError:
+                raise TimeoutError(
+                    f"uiautomator2 连接超时（{timeout}s），设备序列号: {serial}"
+                ) from None
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
     def health_check(self) -> bool:
         """

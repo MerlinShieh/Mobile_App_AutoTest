@@ -5,11 +5,49 @@
 """
 
 import subprocess
+import time
+from concurrent.futures import TimeoutError as FutureTimeoutError
 
 import pytest
 
 from mobile_automation.device.device_manager import DeviceManager, DeviceInfo
+from mobile_automation.device.u2_controller import U2Controller
 from mobile_automation.exception import DeviceConnectionError
+
+
+class TestU2ControllerConnectTimeout:
+    """测试 U2Controller 连接超时保护。"""
+
+    def test_connect_timeout_raises(self, mocker):
+        """验证 u2.connect 阻塞超过超时阈值时抛出 TimeoutError。"""
+
+        def slow_connect(serial):
+            time.sleep(30)
+            return mocker.MagicMock()
+
+        mocker.patch("mobile_automation.device.u2_controller.u2.connect", side_effect=slow_connect)
+
+        with pytest.raises(FutureTimeoutError):
+            U2Controller._connect_with_timeout("test-device", timeout=1.0)
+
+    def test_connect_success_within_timeout(self, mocker):
+        """验证连接在超时阈值内完成时正常返回。"""
+        mock_device = mocker.MagicMock()
+        mock_device.info = {"display": "1080x1920"}
+        mocker.patch("mobile_automation.device.u2_controller.u2.connect", return_value=mock_device)
+
+        device = U2Controller._connect_with_timeout("test-device", timeout=5.0)
+        assert device is mock_device
+
+    def test_connect_error_propagates(self, mocker):
+        """验证连接抛出的原始异常正常传播（不吞异常）。"""
+        mocker.patch(
+            "mobile_automation.device.u2_controller.u2.connect",
+            side_effect=ConnectionError("device not found"),
+        )
+
+        with pytest.raises(ConnectionError, match="device not found"):
+            U2Controller._connect_with_timeout("test-device", timeout=5.0)
 
 
 class TestDeviceManager:
