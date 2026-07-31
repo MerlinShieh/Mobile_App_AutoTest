@@ -21,6 +21,7 @@ from typing import Optional
 
 from ..config import settings
 from ..device.device_manager import DeviceManager
+from ..exception.error_handler import ErrorHandler
 from ..executor.action_executor import ActionExecutor
 from ..llm.llm_service import LLMService
 from ..llm.token_budget import TokenBudgetManager
@@ -101,6 +102,7 @@ class StepRunner:
         self._token_budget: Optional[TokenBudgetManager] = token_budget
         self._page_diff: PageChangeDetector = PageChangeDetector()
         self._decision_builder: DecisionPromptBuilder = DecisionPromptBuilder()
+        self._error_handler: ErrorHandler = ErrorHandler(device_manager=device_manager)
         logger.debug("StepRunner 初始化完成")
 
     def set_archiver(self, archiver: DataArchiver) -> None:
@@ -192,6 +194,21 @@ class StepRunner:
                 record.retry_count += 1
                 record.error_message = str(exc)
                 logger.error("Step %d 执行异常: %s", step_index, exc)
+
+                # ErrorHandler 自动恢复：分类异常并尝试恢复动作
+                # （设备重连 / LLM 指数退避），恢复成功则不消耗重试计数
+                recovered = False
+                recovery = "none"
+                try:
+                    category, recovery = self._error_handler.classify(exc)
+                    recovered = bool(self._error_handler.handle(exc, category, recovery))
+                except Exception as recovery_exc:
+                    logger.warning("ErrorHandler 恢复动作本身异常: %s", recovery_exc)
+
+                if recovered:
+                    record.status = StepStatus.RETRYING
+                    logger.info("Step %d ErrorHandler 已自动恢复（%s），重新执行", step_index, recovery)
+                    continue
 
                 if record.retry_count >= settings.execution.max_retries_per_step:
                     record.status = StepStatus.FAILED
