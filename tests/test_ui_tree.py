@@ -190,3 +190,38 @@ class TestUITreeExtractor:
         region_map = dict(groups)
         assert "#1" in region_map.get("TOP_BAR", []) or "#1" in region_map.get("FEED", [])
         assert "#2" in region_map.get("BOTTOM_NAV", [])
+
+    def test_format_node_line_marks_edittext(self):
+        """验证 EditText 输入框节点在摘要中标记为 输入框。"""
+        node = UINode(
+            element_id="#3",
+            class_name="android.widget.EditText",
+            bounds=(100, 200, 500, 300),
+        )
+        line = UITreeExtractor._format_node_line(node)
+        assert "输入框" in line
+        assert "#3" in line
+
+    def test_format_node_line_marks_password_input(self):
+        """验证密码输入框节点在摘要中标记为 输入框。"""
+        node = UINode(
+            element_id="#4",
+            class_name="android.widget.EditText",
+            password=True,
+            bounds=(100, 200, 500, 300),
+        )
+        line = UITreeExtractor._format_node_line(node)
+        assert "输入框" in line
+        assert "#4" in line
+
+    def test_format_node_line_no_input_marker_for_button(self):
+        """验证普通按钮不误标为输入框。"""
+        node = UINode(
+            element_id="#5",
+            class_name="android.widget.Button",
+            clickable=True,
+            bounds=(100, 200, 500, 300),
+        )
+        line = UITreeExtractor._format_node_line(node)
+        assert "输入框" not in line
+        assert "可点" in line
