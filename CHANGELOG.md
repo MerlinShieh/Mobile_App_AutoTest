@@ -3,11 +3,32 @@
 > 本文件记录 Mobile_App_AutoTest 的版本迭代历史。
 > 版本规则：**大版本（major）= 里程碑级更新**（架构/稳定性/能力体系），**小版本（minor）= 功能迭代批次**，patch = 单点修复。
 
-当前建议版本：**v1.3.1**
+当前建议版本：**v1.4.0**
 
 ---
 
 # 最近更新
+
+## v1.4.0 — StepRunner 上帝类拆分（2026-08-01）
+
+### 重构
+- **StepRunner 按职责拆分为三个独立流水线**（`core/pipelines/`）：
+  - **PerceptionPipeline**：感知 + 弹窗处理 + 操作前截图/XML/摘要归档（原 `_perceive_with_popup_handling` / `_archive_screenshot` / `_archive_xml_and_summary`）
+  - **DecisionEngine**：LLM 决策 + Token 压缩策略 + 响应解析 + 坐标/可滚动容器解析 + LLM 交互归档（原 `_decide_action` / `_parse_llm_response` / `_sanitize_json_strings` / `_resolve_action_coordinates` / `_resolve_scrollable_container` / `_archive_llm_interaction`）
+  - **ExecutionPipeline**：执行验证 + 操作后截图/步骤归档（原 `_verify_and_finalize` / `_register_step_archive` / `_format_action_detail`）
+- **StepRunner 瘦身为薄编排层**：744 行 → 227 行，仅保留 `run_step` 流程编排、重试控制与 ErrorHandler 异常恢复
+- 三者互不引用，仅由 StepRunner 顺序调用；`set_archiver` / `set_token_budget` 转发绑定到各 pipeline
+- `_parse_llm_response` 保留静态转发到 `DecisionEngine.parse_llm_response`，对外接口完全不变
+
+### 验证
+- 单元测试：**378 → 380 passed**（0 回归，含 25 个受影响用例 + 全量）
+- 覆盖率：**66.2% → 66.88%**（新增 pipeline 模块被原 StepRunner 用例覆盖，无覆盖率下降）
+- 无新增类型错误
+
+### 待办
+- ⏳ 端到端真机验证：架构拆分不影响运行时行为，待设备连接后跑 3 次端到端冒烟回归
+
+---
 
 ## v1.3.2 — LLM 输入流程强化（2026-08-01）
 

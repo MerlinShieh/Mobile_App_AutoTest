@@ -6,8 +6,9 @@
 
 移动端 AI 自动化测试框架，使用多模态大模型（Qwen-VL）驱动 Android 设备自动化操作。
 
-- **位置**：`wsl2：/mnt/c/Users/Mulin/Documents/Mobile_App_AutoTest（windows：C:\Users\Mulin\Documents\Mobile_App_AutoTest）`
+- **位置**：`windows：C:\Users\Mulin\Documents\Mobile_App_AutoTest`
 - **语言**：Python 3.10+
+- **环境**：Windows 11（需要考虑Linux和MacOS环境兼容）
 - **包管理**：uv / pip，venv 在 `.venv/`
 - **测试框架**：pytest
 
@@ -72,9 +73,10 @@ mobile_automation/
 - 日志自动初始化
 - 异常体系重构（ErrorHandler 集成重连/指数退避恢复）
 - 行尾符规范化（.gitattributes, LF）
+- StepRunner 上帝类拆分（v1.4.0：core/pipelines 三个独立流水线 + 薄编排层）
 
 **测试数据：**
-- 单元测试：378 个，100% 通过
+- 单元测试：380 个，100% 通过
 - 端到端自动测试：6 用例，通过率 33%（2/6）
 - 2026-08-01 真机输入流程专项验证：3/3 通过（搜索框输入原神/王者荣耀/和平精英）
 
@@ -83,7 +85,6 @@ mobile_automation/
 1. **LLM Prompt 语义理解**：模型只点击搜索框不输入文本 → v1.3.2 已强化输入流程指引 + UI 树输入框标记，2026-08-01 真机（MuMu 模拟器 127.0.0.1:5555）端到端验证 3/3 通过（原神/王者荣耀/和平精英，均 click→type→terminate，输入真实生效）
    - 残留瑕疵：type 替换预填内容时若不清空会文本拼接（如「原神王者荣耀」），搜索结果仍正确展示，可后续增加 clear 语义或先全选删除
 2. **弹窗检测误报**：仍偶发误报，v1.3.1 已加处理失败退出机制（自动处理失败达 2 次后放行 LLM）防死循环 → 特征文本过滤仍可继续优化
-3. **StepRunner 上帝类**：708 行，5 种职责耦合 → 拆分方案已出，待专项执行
 
 ## 常用命令
 
