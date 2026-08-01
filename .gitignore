@@ -16,3 +16,6 @@ htmlcov/
 dist/
 build/
 qwen-code-export-*.json
+
+# Syncthing 同步标记（非代码）
+.stfolder/
