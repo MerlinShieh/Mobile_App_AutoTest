@@ -7,7 +7,7 @@
 
 import io
 import time
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from PIL import Image
 
@@ -15,6 +15,9 @@ from ..config import settings
 from ..device.device_manager import DeviceManager
 from ..logger import get_logger
 from .image_util import compress_image, encode_base64
+
+if TYPE_CHECKING:
+    from ..models.perception import PerceptualResult
 
 logger = get_logger(__name__)
 

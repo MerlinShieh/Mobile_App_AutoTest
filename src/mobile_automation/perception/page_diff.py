@@ -6,11 +6,14 @@
 """
 
 import time
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from ..config import settings
 from ..logger import get_logger
 from ..models.perception import UINode, UITree, PageChangeResult
+
+if TYPE_CHECKING:
+    from .ui_tree import UITreeExtractor
 
 logger = get_logger(__name__)
 
@@ -188,12 +191,17 @@ class PageChangeDetector:
             import cv2
             import numpy as np
 
-            def b64_to_img(b64_str: str) -> np.ndarray:
+            def b64_to_img(b64_str: str) -> Optional[np.ndarray]:
                 raw = np.frombuffer(base64.b64decode(b64_str), dtype=np.uint8)
-                return cv2.imdecode(raw, cv2.IMREAD_GRAYSCALE)
+                img = cv2.imdecode(raw, cv2.IMREAD_GRAYSCALE)
+                return img if img is not None else None
 
             img1 = b64_to_img(cur_b64)
             img2 = b64_to_img(prev_b64)
+
+            if img1 is None or img2 is None:
+                logger.warning("视觉差异检测：截图 Base64 解码失败，跳过本次比较")
+                return 0.0
 
             if img1.shape != img2.shape:
                 img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))

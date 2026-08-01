@@ -156,7 +156,14 @@ class ClaudeAdapter(LLMAdapter):
             logger.error("Claude 调用发生未知异常: %s", exc)
             raise LLMServiceError(f"Claude 调用异常: {exc}", provider="anthropic") from exc
 
-        result: str = response.content[0].text if response.content else ""
+        result: str = ""
+        for block in (response.content or []):
+            text = getattr(block, "text", None)
+            if isinstance(text, str):
+                result += text
+        if not result:
+            logger.warning("Claude 响应无文本内容（可能为 thinking/工具调用块）: %s",
+                           [getattr(b, "type", "unknown") for b in (response.content or [])])
         logger.debug("ClaudeAdapter.chat 收到回复: %d 字符", len(result))
         return result
 
