@@ -3,11 +3,33 @@
 > 本文件记录 Mobile_App_AutoTest 的版本迭代历史。
 > 版本规则：**大版本（major）= 里程碑级更新**（架构/稳定性/能力体系），**小版本（minor）= 功能迭代批次**，patch = 单点修复。
 
-当前建议版本：**v1.2.0**
+当前建议版本：**v1.3.0**
 
 ---
 
 # 最近更新
+
+## v1.3.0 — P2 收尾 + 类型隐患修复（2026-08-01）
+
+### 新增
+- **适配器资源释放**（`bf2df79`）：`LLMAdapter` 基类新增 `close()` 默认实现（幂等空操作），OpenAI/Claude/Qwen/Zhipu/MiMo 五个适配器覆盖实现并调用 SDK `client.close()` 释放连接池，避免长期运行泄漏
+- **LSP 类型隐患修复**（`bf2df79` 之后的提交）：
+  - `page_diff.py` / `screen_capture.py` 前向引用补 `TYPE_CHECKING` 导入，消除 `get_type_hints` 时的 NameError
+  - `claude_adapter.py` thinking 块防御：`response.content` 遍历安全提取 text，不再因 ThinkingBlock 无 `text` 属性崩溃
+  - `page_diff.py` `cv2.imdecode` 解码失败（返回 None）时跳过比较，避免 `img.shape` 崩溃
+- **测试新增**：`test_wait_executor.py`（6 用例）、`test_adb_controller.py`（8 用例）、`test_claude_adapter.py`（7 用例）
+
+### 修复
+- **wait_executor None 防御**（`bf2df79`）：`execute()` 对 action/params 为 None 时回退默认 1500ms 等待，不再抛 AttributeError
+- **adb shell 注入防护**（`bf2df79`）：`shell()` 新增 `_validate_shell_command` 校验，拒绝空命令/含 shell 元字符（`; & | > < $ \` 换行）/危险关键字（rm/mv/dd/reboot/su/sh）的命令
+
+### 验证
+- 单元测试：**362 passed**（新增 21 个用例，0 回归）
+- mypy 全量检查：31 → 17 错误（修复 3 类真实隐患，剩余 17 个经逐项验证为纯类型噪音，不影响运行时）
+
+---
+
+# 历史版本
 
 ## v1.2.0 — P2 质量改进（2026-07-31）
 
@@ -184,16 +206,25 @@
 
 # 遗留问题清单（待办）
 
-| # | 问题 | 来源 | 优先级 |
-|---|------|------|--------|
-| 1 | **P1-5 StepRunner 上帝类拆分**：708 行、14 个依赖、5 种职责耦合，经确认本次跳过 | 架构审查报告方案 1（强烈推荐） | P1 |
-| 2 | **弹窗检测误报**：仍有偶发误报导致死循环，P0-2 已加防御（(0,0) 屏幕尺寸）但特征文本过滤需持续优化 | bug_analysis.md P0 #2 | P1 |
-| 3 | **LLM Prompt 语义理解**：偶发"只点击搜索框不输入文本"，Prompt 已强化，需端到端反复验证 | bug_analysis.md P0 #1 | P1 |
-| 4 | **端到端测试通过率低**：6 用例通过率 33%（2/6），需随模型/Prompt 迭代提升 | 项目状态记录 | P2 |
-| 5 | **适配器资源释放**：OpenAI/Anthropic client 无 `close()` 方法，长期运行可能连接池泄漏 | 代码审查（LLM 模块） | P2 |
-| 6 | **`message_builder.py` 弃用但保留**：与 DecisionPromptBuilder 功能重叠，因 AGENTS.md 禁止删除已有测试而保留，后续评估删除 | 代码审查（死代码） | P3 |
-| 7 | **工作区未提交改动**：存在大量预存未提交文件（行尾符 LF/CRLF 差异等），需确认后单独处理 | git status | P3 |
-| 8 | **文档同步**：AGENTS.md 中默认多模态模型（glm-4.1v）与实际配置（mimo-omni）不一致，需更新 | 配置审查 | P3 |
+> 状态：✅ 已解决　⏳ 待处理
+
+| # | 问题 | 来源 | 优先级 | 状态 |
+|---|------|------|--------|------|
+| 1 | **P1-5 StepRunner 上帝类拆分**：708 行、14 个依赖、5 种职责耦合 | 架构审查报告方案 1（强烈推荐） | P1 | ⏳ 规划中（v1.4.0 专项） |
+| 2 | **弹窗检测误报**：仍有偶发误报导致死循环，P0-2 已加防御（(0,0) 屏幕尺寸）但特征文本过滤需持续优化 | bug_analysis.md P0 #2 | P1 | ⏳ 待优化 |
+| 3 | **LLM Prompt 语义理解**：偶发"只点击搜索框不输入文本"，Prompt 已强化，需端到端反复验证 | bug_analysis.md P0 #1 | P1 | ⏳ 待端到端验证 |
+| 4 | **端到端测试通过率低**：6 用例通过率 33%（2/6），需随模型/Prompt 迭代提升 | 项目状态记录 | P2 | ⏳ 待真实设备验证（唯一剩余 P2） |
+| 5 | **适配器资源释放**：OpenAI/Anthropic client 无 `close()` 方法，长期运行可能连接池泄漏 | 代码审查（LLM 模块） | P2 | ✅ v1.3.0（`bf2df79`） |
+| 6 | **`message_builder.py` 弃用但保留**：与 DecisionPromptBuilder 功能重叠 | 代码审查（死代码） | P3 | ✅ v1.3.0（移除包级导出 `acc5503`，文件按 AGENTS.md 保留） |
+| 7 | **工作区未提交改动**：大量预存未提交文件（行尾符 LF/CRLF 差异等） | git status | P3 | ✅ v1.3.0（`.gitattributes` + renormalize，`b145072`） |
+| 8 | **文档同步**：AGENTS.md 默认多模态模型（glm-4.1v）与实际（mimo-omni）不一致 | 配置审查 | P3 | ✅ v1.3.0（`acc5503`） |
+
+**已闭环批次**（含上述已解决项）：
+- **P0 全部 5 项**（`d02cecc`/`8ae2d6b`/`8ce253a`/`25001a7`/`11738da`）
+- **P1 除 StepRunner 外 4 项**（`b0286bf`/`67387c3`/`d096405`/`e8fbd90`）
+- **P2 代码级 3 项**：执行器/core/device（`e8f22a4`/`9c5ae81`/`bac6600`）+ 资源释放/None 防御/注入防护（`bf2df79`）
+- **P3 全部 3 项**（`b145072`/`acc5503`）
+- **类型隐患 3 项**：前向引用 NameError、Claude thinking 块、cv2 解码失败（v1.3.0 提交）
 
 ---
 
@@ -204,7 +235,8 @@ v0.1 → v0.7   初始开发阶段（基础功能 → 稳定性 → 能力扩展
 v1.0.0        P0 稳定性里程碑（高风险问题全部修复）
 v1.1.0        P1 架构级改进（ErrorHandler 集成 / Token 统一 / 配置统一）
 v1.2.0        P2 质量改进（执行器 / core / device 边界修复）
-v1.3.0        [规划] P1-5 StepRunner 拆分（独立专项）
-v1.4.0        [规划] 端到端通过率提升（Prompt/模型调优）
+v1.3.0        P2 收尾（资源释放 / None 防御 / 注入防护 / 类型隐患）
+v1.4.0        [规划] P1-5 StepRunner 拆分（独立专项）
+v1.5.0        [规划] 端到端通过率提升（Prompt/模型调优，需真实设备）
 v2.0.0        [规划] 多设备并行 / 测试框架能力扩展
 ```
