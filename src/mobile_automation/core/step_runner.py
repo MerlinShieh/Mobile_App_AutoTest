@@ -256,6 +256,15 @@ class StepRunner:
 
         popup_result = self._popup_handler.detect(perceptual.ui_tree)
         if popup_result and popup_result.detected:
+            if not popup_result.auto_handlable:
+                # 弹窗自动处理已达失败上限（或类型不匹配），
+                # 不再重试感知死循环，放行给 LLM 决策处理
+                logger.warning(
+                    "Step %d 弹窗自动处理失败次数过多，放行给 LLM 决策: type=%s",
+                    step_index, popup_result.popup_type.value,
+                )
+                return perceptual
+
             handled = self._popup_handler.handle(popup_result)
             if handled:
                 logger.info("Step %d 弹窗已处理，重新感知并重试", step_index)

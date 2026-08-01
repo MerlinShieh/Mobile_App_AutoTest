@@ -37,6 +37,7 @@ class PopupDetectResult:
     popup_type: PopupType = PopupType.UNKNOWN
     dialog_nodes: list = field(default_factory=list)
     confidence: float = 0.0
+    auto_handlable: bool = True
 
     def __post_init__(self) -> None:
         """初始化完成后记录日志。"""

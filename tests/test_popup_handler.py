@@ -227,3 +227,85 @@ class TestPatternRules:
         rules = PatternRules()
         strategy = rules.get_strategy(PopupType.UNKNOWN)
         assert strategy == PopupStrategy.REPORT_TO_LLM
+
+
+class TestPopupHandlerExitMechanism:
+    """测试弹窗自动处理失败退出机制（防死循环）。"""
+
+    def test_can_auto_handle_initial(self, mocker):
+        """验证初始状态弹窗允许自动处理。"""
+        mock_dm = mocker.MagicMock()
+        handler = PopupHandler(mock_dm)
+        nodes = [UINode(element_id="#1", bounds=(10, 10, 100, 100))]
+        assert handler._can_auto_handle(nodes) is True
+
+    def test_can_auto_handle_after_max_attempts(self, mocker):
+        """验证失败达到上限后返回 False。"""
+        mock_dm = mocker.MagicMock()
+        handler = PopupHandler(mock_dm)
+        nodes = [UINode(element_id="#1", bounds=(10, 10, 100, 100))]
+        handler._record_handle_failure(nodes)
+        handler._record_handle_failure(nodes)
+        assert handler._can_auto_handle(nodes) is False
+
+    def test_fingerprint_ignores_node_order(self, mocker):
+        """验证指纹不依赖节点顺序。"""
+        mock_dm = mocker.MagicMock()
+        handler = PopupHandler(mock_dm)
+        nodes_a = [UINode(element_id="#1", bounds=(10, 10, 100, 100))]
+        nodes_b = [UINode(element_id="#2", bounds=(10, 10, 100, 100))]
+        assert handler._fingerprint(nodes_a) == handler._fingerprint(nodes_b)
+
+    def test_clear_fingerprint_resets_failure(self, mocker):
+        """验证处理成功后清空失败计数。"""
+        mock_dm = mocker.MagicMock()
+        handler = PopupHandler(mock_dm)
+        nodes = [UINode(element_id="#1", bounds=(10, 10, 100, 100))]
+        handler._record_handle_failure(nodes)
+        handler._record_handle_failure(nodes)
+        assert handler._can_auto_handle(nodes) is False
+        handler._clear_fingerprint(nodes)
+        assert handler._can_auto_handle(nodes) is True
+
+    def test_handle_failure_records_fingerprint(self, mocker):
+        """验证自动处理失败时记录指纹，连续失败后 detect 返回 auto_handlable=False。"""
+        mock_dm = mocker.MagicMock()
+        mock_u2 = mocker.MagicMock()
+        mock_u2.click_by_text.return_value = False
+        mock_dm.get_u2.return_value = mock_u2
+
+        handler = PopupHandler(mock_dm)
+        nodes = [UINode(element_id="#1", bounds=(10, 10, 100, 100))]
+
+        result = PopupDetectResult(detected=True, popup_type=PopupType.PERMISSION_DIALOG,
+                                   dialog_nodes=nodes)
+        assert handler.handle(result) is False
+        assert handler._can_auto_handle(nodes) is True
+        assert handler.handle(result) is False
+        assert handler._can_auto_handle(nodes) is False
+
+    def test_handle_success_clears_fingerprint(self, mocker):
+        """验证处理成功后清空指纹，后续弹窗仍可自动处理。"""
+        mock_dm = mocker.MagicMock()
+        mock_u2 = mocker.MagicMock()
+        mock_u2.click_by_text.return_value = True
+        mock_dm.get_u2.return_value = mock_u2
+
+        handler = PopupHandler(mock_dm)
+        nodes = [UINode(element_id="#1", bounds=(10, 10, 100, 100))]
+
+        result = PopupDetectResult(detected=True, popup_type=PopupType.PERMISSION_DIALOG,
+                                   dialog_nodes=nodes)
+        assert handler.handle(result) is True
+        assert handler._can_auto_handle(nodes) is True
+
+    def test_report_to_llm_not_recorded_as_failure(self, mocker):
+        """验证 REPORT_TO_LLM 策略不记录失败（本应交由 LLM 决策）。"""
+        mock_dm = mocker.MagicMock()
+        handler = PopupHandler(mock_dm)
+        nodes = [UINode(element_id="#1", bounds=(10, 10, 100, 100))]
+
+        result = PopupDetectResult(detected=True, popup_type=PopupType.UNKNOWN,
+                                   dialog_nodes=nodes)
+        assert handler.handle(result) is False
+        assert handler._can_auto_handle(nodes) is True

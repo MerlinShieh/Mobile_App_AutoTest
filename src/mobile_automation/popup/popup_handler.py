@@ -20,6 +20,9 @@ from ..models.perception import UINode, UITree
 from .models import PopupDetectResult, PopupRule
 from .pattern_rules import PatternRules
 
+MAX_HANDLE_ATTEMPTS: int = 2
+"""同一弹窗自动处理失败的最大尝试次数，超过后交由 LLM 决策，避免死循环。"""
+
 logger = get_logger(__name__)
 
 
@@ -64,7 +67,87 @@ class PopupHandler:
         """
         self._dm: DeviceManager = device_manager
         self._rules: PatternRules = PatternRules()
+        self._popup_fingerprints: dict[str, int] = {}
+        """弹窗指纹 -> 已尝试自动处理次数。用于跟踪同一弹窗的处理失败情况。"""
         logger.debug("PopupHandler 初始化完成")
+
+    def _fingerprint(self, nodes: list[UINode]) -> str:
+        """
+        生成弹窗节点的稳定指纹。
+
+        基于节点集合的 bounds 与 text 计算，用于识别"是否是同一个弹窗"。
+        节点顺序不影响结果（对特征排序后拼接）。
+
+        参数
+        ----------
+        nodes : list[UINode]
+            弹窗关联的节点列表。
+
+        返回
+        -------
+        str
+            弹窗指纹字符串。
+        """
+        if not nodes:
+            return ""
+        features = sorted(
+            (str(n.bounds), n.text or "") for n in nodes
+        )
+        return "|".join(f"{b}:{t}" for b, t in features)
+
+    def _can_auto_handle(self, nodes: list[UINode]) -> bool:
+        """
+        判断该弹窗是否仍允许自动处理。
+
+        同一弹窗（指纹相同）自动处理失败次数累计达到上限后，
+        返回 False 表示不再自动处理，交由调用方决定（如上报 LLM）。
+
+        参数
+        ----------
+        nodes : list[UINode]
+            弹窗关联的节点列表。
+
+        返回
+        -------
+        bool
+            True 表示仍可自动处理，False 表示已达失败上限。
+        """
+        fp: str = self._fingerprint(nodes)
+        if not fp:
+            return True
+        return self._popup_fingerprints.get(fp, 0) < MAX_HANDLE_ATTEMPTS
+
+    def _record_handle_failure(self, nodes: list[UINode]) -> None:
+        """
+        记录一次自动处理失败。
+
+        按弹窗指纹累计失败次数。成功后调用 _clear_fingerprint 重置。
+
+        参数
+        ----------
+        nodes : list[UINode]
+            弹窗关联的节点列表。
+        """
+        fp: str = self._fingerprint(nodes)
+        if not fp:
+            return
+        self._popup_fingerprints[fp] = self._popup_fingerprints.get(fp, 0) + 1
+        logger.debug("弹窗自动处理失败累计: fingerprint=%s, attempts=%d",
+                     fp, self._popup_fingerprints[fp])
+
+    def _clear_fingerprint(self, nodes: list[UINode]) -> None:
+        """
+        清空弹窗指纹的失败计数（处理成功后调用）。
+
+        参数
+        ----------
+        nodes : list[UINode]
+            弹窗关联的节点列表。
+        """
+        fp: str = self._fingerprint(nodes)
+        if fp and fp in self._popup_fingerprints:
+            self._popup_fingerprints.pop(fp, None)
+            logger.debug("弹窗指纹失败计数已清除: %s", fp)
 
     def detect(self, tree: UITree) -> Optional[PopupDetectResult]:
         """
@@ -99,6 +182,7 @@ class PopupHandler:
             return PopupDetectResult(
                 detected=True, popup_type=popup_type,
                 dialog_nodes=dialog_nodes, confidence=0.85,
+                auto_handlable=self._can_auto_handle(dialog_nodes),
             )
 
         overlay_nodes: list[UINode] = self._find_overlay(tree)
@@ -107,6 +191,7 @@ class PopupHandler:
             return PopupDetectResult(
                 detected=True, popup_type=PopupType.UNKNOWN,
                 dialog_nodes=overlay_nodes, confidence=0.7,
+                auto_handlable=self._can_auto_handle(overlay_nodes),
             )
 
         text_match_nodes: list[UINode] = self._find_by_feature_text(tree)
@@ -115,6 +200,7 @@ class PopupHandler:
             return PopupDetectResult(
                 detected=True, popup_type=PopupType.UNKNOWN,
                 dialog_nodes=text_match_nodes, confidence=0.6,
+                auto_handlable=self._can_auto_handle(text_match_nodes),
             )
 
         logger.debug("弹窗检测未发现弹窗")
@@ -145,21 +231,28 @@ class PopupHandler:
 
         try:
             if strategy == PopupStrategy.ALLOW:
-                return self._click_button_by_texts(["允许", "同意", "确定", "allow", "agree", "ok"])
+                ok = self._click_button_by_texts(["允许", "同意", "确定", "allow", "agree", "ok"])
             elif strategy == PopupStrategy.DENY:
-                return self._click_button_by_texts(["拒绝", "deny", "禁止"])
+                ok = self._click_button_by_texts(["拒绝", "deny", "禁止"])
             elif strategy == PopupStrategy.DISMISS:
-                return self._dismiss_popup()
+                ok = self._dismiss_popup()
             elif strategy == PopupStrategy.CANCEL:
-                return self._click_button_by_texts(["取消", "稍后", "later", "cancel"])
+                ok = self._click_button_by_texts(["取消", "稍后", "later", "cancel"])
             elif strategy == PopupStrategy.REPORT_TO_LLM:
                 logger.info("弹窗类型 %s 需上报 LLM 决策", detect_result.popup_type.value)
                 return False
             else:
                 logger.warning("未知的处理策略: %s", strategy)
                 return False
+
+            if ok:
+                self._clear_fingerprint(detect_result.dialog_nodes)
+            else:
+                self._record_handle_failure(detect_result.dialog_nodes)
+            return ok
         except Exception as exc:
             logger.error("弹窗处理异常: type=%s, error=%s", detect_result.popup_type.value, exc)
+            self._record_handle_failure(detect_result.dialog_nodes)
             return False
 
     def _find_dialog_nodes(self, tree: UITree) -> list[UINode]:
