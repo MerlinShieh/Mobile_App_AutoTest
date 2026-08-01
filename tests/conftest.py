@@ -23,8 +23,27 @@ _imports_to_mock = {
     "cv2": MagicMock(),
     "numpy": MagicMock(),
 }
+
+# 为 openai/anthropic 注入真实的异常类（安装则用真实类，否则用虚拟子类），
+# 否则适配器中 `except APIError` 会因捕获 MagicMock 类而抛 TypeError
+try:
+    from openai import APIError as _openai_api_error_cls
+except ImportError:  # pragma: no cover
+    class _openai_api_error_cls(Exception):  # type: ignore[no-redef]
+        """openai 未安装时的虚拟异常类。"""
+
+try:
+    from anthropic import APIError as _anthropic_api_error_cls
+except ImportError:  # pragma: no cover
+    class _anthropic_api_error_cls(Exception):  # type: ignore[no-redef]
+        """anthropic 未安装时的虚拟异常类。"""
+
 for _mod_name, _mod_val in _imports_to_mock.items():
     if _mod_name not in sys.modules:
+        if _mod_name == "openai":
+            _mod_val.APIError = _openai_api_error_cls
+        elif _mod_name == "anthropic":
+            _mod_val.APIError = _anthropic_api_error_cls
         sys.modules[_mod_name] = _mod_val
 
 from mobile_automation.models.action import Action, ActionParams
@@ -62,6 +81,11 @@ def mock_device_manager(mocker):
     mock_adb = mocker.MagicMock()
     mock_adb.shell.return_value = ("1080x2400", "")
     mock_adb.screenshot.return_value = b"fake_adb_image_bytes"
+    mock_adb.lock_screen.return_value = None
+    mock_adb.open_notifications.return_value = None
+    mock_adb.set_rotation.return_value = None
+    mock_adb.volume_up.return_value = None
+    mock_adb.volume_down.return_value = None
     instance.get_adb.return_value = mock_adb
 
     return instance
@@ -99,6 +123,11 @@ def mock_adb(mocker):
     adb.screenshot.return_value = b"fake_adb_image_bytes"
     adb.reconnect.return_value = True
     adb.wait_for_device.return_value = True
+    adb.lock_screen.return_value = None
+    adb.open_notifications.return_value = None
+    adb.set_rotation.return_value = None
+    adb.volume_up.return_value = None
+    adb.volume_down.return_value = None
     return adb
 
 

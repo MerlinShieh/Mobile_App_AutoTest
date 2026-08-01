@@ -101,7 +101,9 @@ class TaskOrchestrator:
         context: TaskContext = TaskContext(
             task_id=str(uuid.uuid4())[:8],
             user_goal=user_goal,
-            max_steps=max_steps or settings.execution.max_steps_per_task,
+            # 仅在显式传入 None 时使用配置默认值；max_steps=0 表示"不限制步数"
+            # （or 运算符会错误地把 0 当成假值替换为默认值）
+            max_steps=settings.execution.max_steps_per_task if max_steps is None else max_steps,
         )
 
         self._last_actions = []
@@ -117,7 +119,10 @@ class TaskOrchestrator:
         logger.info("任务 %s 开始执行: user_goal=%s, max_steps=%d",
                      context.task_id, user_goal, context.max_steps)
 
-        while not context.is_completed() and context.current_step < context.max_steps:
+        # max_steps=0 表示不限制步数（由任务超时或完成条件终止）
+        while not context.is_completed() and (
+            context.max_steps == 0 or context.current_step < context.max_steps
+        ):
             if self._check_timeout(context):
                 context.status = TaskStatus.FAILED
                 logger.warning("任务 %s 超时，已执行 %d 步", context.task_id, context.current_step)
@@ -151,7 +156,11 @@ class TaskOrchestrator:
                     break
 
                 if record.is_success():
-                    context.page_history.append(record.page_summary)
+                    action_desc = f"[{record.action.action_type.value}"
+                    if record.action.params.element_id:
+                        action_desc += f" #{record.action.params.element_id}"
+                    action_desc += f"] {record.action.reason[:60]}"
+                    context.page_history.append(f"{action_desc}\n{record.page_summary}")
                     logger.debug("任务 %s 步骤 %d 成功", context.task_id, step_index)
                 else:
                     logger.warning("任务 %s 步骤 %d 失败: %s",
@@ -167,7 +176,9 @@ class TaskOrchestrator:
                     break
 
             except Exception as exc:
-                logger.error("任务 %s 步骤 %d 发生未预期异常: %s", context.task_id, step_index, exc)
+                # exc_info=True 保留完整 traceback，便于排查未预期异常
+                logger.error("任务 %s 步骤 %d 发生未预期异常: %s", context.task_id, step_index, exc,
+                             exc_info=True)
                 context.status = TaskStatus.FAILED
                 break
 
@@ -175,19 +186,25 @@ class TaskOrchestrator:
             context.status = TaskStatus.COMPLETED
             logger.info("任务 %s 正常完成，共执行 %d 步", context.task_id, context.current_step)
 
-        archiver.save_task_meta({
-            "task_id": context.task_id,
-            "user_goal": context.user_goal,
-            "status": context.status.value,
-            "steps": len(context.steps),
-            "success_rate": context.get_success_rate(),
-            "total_tokens": context.total_tokens_used,
-            "created_at": str(context.created_at),
-        })
+        try:
+            archiver.save_task_meta({
+                "task_id": context.task_id,
+                "user_goal": context.user_goal,
+                "status": context.status.value,
+                "steps": len(context.steps),
+                "success_rate": context.get_success_rate(),
+                "total_tokens": context.total_tokens_used,
+                "created_at": str(context.created_at),
+            })
+        except OSError as exc:
+            logger.warning("任务 %s 元数据保存失败（不影响任务结果）: %s", context.task_id, exc)
 
         report_generator = ReportGenerator(context, archiver)
-        report_path = report_generator.generate()
-        logger.info("任务 %s 报告已生成: %s", context.task_id, report_path)
+        try:
+            report_path = report_generator.generate()
+            logger.info("任务 %s 报告已生成: %s", context.task_id, report_path)
+        except OSError as exc:
+            logger.warning("任务 %s 报告生成失败（不影响任务结果）: %s", context.task_id, exc)
 
         logger.info("任务 %s 结束: status=%s, steps=%d, tokens=%d",
                      context.task_id, context.status.value, context.current_step, context.total_tokens_used)

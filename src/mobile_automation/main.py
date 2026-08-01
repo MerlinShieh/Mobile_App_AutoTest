@@ -4,6 +4,10 @@ CLI 入口 —— 移动端 AI 自动化操作框架的命令行启动点。
 提供命令行参数解析，支持指定任务描述、设备序列号、LLM 提供商和
 最大步数等参数。启动时自动初始化日志系统、设备连接和所有核心模块。
 
+设计参考:
+- Open-AutoGLM: 交互模式（interactive mode）+ 简洁输出
+- mobile-mcp: 结构化进度反馈
+
 使用方式
 --------
 python -m src.mobile_automation.main --goal "打开设置，找到 Wi-Fi 选项"
@@ -14,7 +18,8 @@ python -m src.mobile_automation.main --goal "..." --provider qwen --max-steps 50
 import argparse
 import io
 import sys
-from typing import Any
+import time
+from typing import Any, Optional
 
 from .config import settings
 from .core.orchestrator import TaskOrchestrator
@@ -23,7 +28,7 @@ from .device.device_manager import DeviceManager
 from .executor.action_executor import ActionExecutor
 from .llm.llm_service import LLMService
 from .llm.token_budget import TokenBudgetManager
-from .logger import get_logger, setup_logger
+from .logger import get_logger, setup_logger, log_step_progress, log_task_start, log_task_end
 from .models.task import TaskContext
 from .perception.screen_capture import ScreenCapture
 from .popup.popup_handler import PopupHandler
@@ -81,7 +86,7 @@ def parse_args() -> argparse.Namespace:
         "-p", "--provider",
         type=str,
         default="",
-        choices=["qwen", "openai", "anthropic", "zhipu"],
+        choices=["qwen", "openai", "anthropic", "zhipu", "mimo", "local"],
         help="LLM 提供商（默认从配置文件读取）",
     )
     parser.add_argument(
@@ -129,9 +134,19 @@ def build_app(args: argparse.Namespace) -> tuple[TaskOrchestrator, DeviceManager
         rotation_mb=settings.logger.log_rotation_mb,
         retention_days=settings.logger.log_retention_days,
     )
-    logger.info("=" * 60)
-    logger.info("移动端 AI 自动化框架启动")
-    logger.info("=" * 60)
+
+    provider_name = args.provider or settings.llm.provider
+    if provider_name not in settings.models.providers:
+        raise RuntimeError(
+            f"供应商 {provider_name} 未在配置中注册，请在 MODELS__PROVIDERS 中配置。"
+            f"当前已注册的供应商: {', '.join(settings.models.providers.keys())}"
+        )
+    provider_cfg = settings.models.providers[provider_name]
+    if not provider_cfg.api_key:
+        raise RuntimeError(
+            f"供应商 {provider_name} 的 API Key 未配置，请在 .env 中设置 "
+            f"MODELS__PROVIDERS__{provider_name.upper()}__API_KEY"
+        )
 
     dm: DeviceManager = DeviceManager()
     serial: str = args.serial or settings.device.serial
@@ -170,6 +185,11 @@ def run_task(orchestrator: TaskOrchestrator, goal: str, max_steps: int) -> TaskC
     """
     执行自动化任务并打印结果摘要。
 
+    参考 Open-AutoGLM 的任务输出格式，新增:
+    - 步骤级进度输出 [step/total]
+    - 任务开始/结束横幅
+    - 执行耗时统计
+
     参数
     ----------
     orchestrator : TaskOrchestrator
@@ -184,43 +204,47 @@ def run_task(orchestrator: TaskOrchestrator, goal: str, max_steps: int) -> TaskC
     TaskContext
         包含执行结果的任务上下文。
     """
-    logger.info("开始执行任务: goal=%s", goal)
+    actual_max_steps = max_steps if max_steps > 0 else settings.execution.max_steps_per_task
+    log_task_start(goal, device=settings.device.serial, max_steps=actual_max_steps)
+
+    start_time: float = time.time()
+
     task_context: TaskContext = orchestrator.execute_task(
         user_goal=goal,
         max_steps=max_steps if max_steps > 0 else None,
     )
 
-    print("\n" + "=" * 60)
-    print("任务执行完成")
-    print("=" * 60)
-    print(f"  任务 ID:     {task_context.task_id}")
-    print(f"  目标:        {task_context.user_goal}")
-    print(f"  状态:        {task_context.status.value}")
-    print(f"  执行步数:    {task_context.current_step}")
-    print(f"  Token 消耗:  {task_context.total_tokens_used}")
-    print(f"  成功率:      {task_context.get_success_rate():.1%}")
+    elapsed: float = time.time() - start_time
 
+    # 使用结构化格式输出步骤详情
     if task_context.steps:
-        print("\n  步骤详情:")
         for step in task_context.steps:
             status_icon: str = {
-                "success": "[OK]",
-                "failed": "[FAIL]",
-                "aborted": "[WARN]",
-                "skipped": "[SKIP]",
-                "retrying": "[RETRY]",
-            }.get(step.status.value, "[?]")
+                "success": "OK",
+                "failed": "FAIL",
+                "aborted": "WARN",
+                "skipped": "SKIP",
+                "retrying": "RETRY",
+            }.get(step.status.value, "?")
             action_desc: str = f"{step.action.action_type.value}"
             if step.action.params.element_id:
                 action_desc += f" [#{step.action.params.element_id}]"
             if step.action.params.text:
-                action_desc += f" \"{step.action.params.text[:20]}\""
-            print(f"    Step {step.step_index:2d} {status_icon} {action_desc:25s} "
-                  f"{step.status.value:10s} retry={step.retry_count}")
-            if step.error_message:
-                print(f"         错误: {step.error_message}")
+                action_desc += f' "{step.action.params.text[:20]}"'
+            log_step_progress(
+                step.step_index,
+                len(task_context.steps),
+                f"{status_icon} {action_desc}",
+                step.action.reason[:60] if step.action.reason else "",
+            )
 
-    print("=" * 60)
+    log_task_end(
+        status=task_context.status.value,
+        steps=task_context.current_step,
+        tokens=task_context.total_tokens_used,
+        duration=elapsed,
+    )
+
     return task_context
 
 
@@ -235,6 +259,7 @@ def main() -> int:
     int
         退出码：0 表示任务成功或部分成功，1 表示任务失败或出错。
     """
+    dm: Optional[DeviceManager] = None
     try:
         args: argparse.Namespace = parse_args()
         orchestrator, dm = build_app(args)

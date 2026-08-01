@@ -50,6 +50,25 @@ class ReportGenerator:
         self._archiver: DataArchiver = archiver
         self._step_archives: list[StepArchiveData] = archiver.step_archives
 
+    @staticmethod
+    def _escape_markdown_table(text: str) -> str:
+        """
+        转义 Markdown 表格中的特殊字符，防止用户/LLM 可控内容破坏报告结构。
+
+        参数
+        ----------
+        text : str
+            原始文本。
+
+        返回
+        -------
+        str
+            转义后的文本（竖线替换为全角｜，换行替换为 <br>）。
+        """
+        if not text:
+            return text
+        return text.replace("|", "｜").replace("\r\n", "<br>").replace("\n", "<br>")
+
     def generate(self) -> Path:
         """
         生成完整的 Markdown 报告文档。
@@ -88,11 +107,12 @@ class ReportGenerator:
         lines.append(self._build_footer())
 
         try:
-            with open(report_path, "w", encoding="utf-8") as f:
+            with open(report_path, "w", encoding="utf-8", newline="\n") as f:
                 f.write("\n".join(lines))
             logger.info("报告已生成: %s", report_path)
         except OSError as exc:
             logger.error("报告写入失败: %s", exc)
+            raise OSError(f"报告写入失败: {report_path} ({exc})") from exc
 
         return report_path
 
@@ -117,7 +137,7 @@ class ReportGenerator:
             "| 项目 | 值 |",
             "|------|-----|",
             f"| **任务 ID** | `{ctx.task_id}` |",
-            f"| **用户目标** | {ctx.user_goal} |",
+            f"| **用户目标** | {self._escape_markdown_table(ctx.user_goal)} |",
             f"| **状态** | {status_badge} |",
             f"| **执行步数** | {total} |",
         ]
@@ -189,7 +209,7 @@ class ReportGenerator:
 
         # 错误信息
         if record.error_message:
-            lines.append(f"> ⚠️ **错误:** {record.error_message}")
+            lines.append(f"> ⚠️ **错误:** {self._escape_markdown_table(record.error_message)}")
             lines.append("")
 
         # ---- 截图对比区域 ----
@@ -230,7 +250,7 @@ class ReportGenerator:
         if action.params.ui_element:
             lines.append(f"| **UI 元素** | `{action.params.ui_element}` |")
         if action.reason:
-            lines.append(f"| **LLM 决策理由** | {action.reason} |")
+            lines.append(f"| **LLM 决策理由** | {self._escape_markdown_table(action.reason)} |")
         lines.append("")
 
         # ---- LLM 决策过程（可折叠） ----

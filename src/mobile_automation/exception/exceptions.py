@@ -3,11 +3,11 @@
 
 按照异常分类（连接、感知、LLM、执行、死循环、超时）定义
 层次化的自定义异常类，所有异常均继承自 MobileAutomationError。
+
+注意：异常类构造函数中不做任何日志记录——异常构造不等于异常发生，
+日志职责由捕获异常的调用方（如 ErrorHandler、Orchestrator）负责，
+避免异常被捕获重试时产生重复/误导性日志。
 """
-
-from ..logger import get_logger
-
-logger = get_logger(__name__)
 
 
 class MobileAutomationError(Exception):
@@ -43,7 +43,6 @@ class DeviceConnectionError(MobileAutomationError):
         self.serial = serial
         detail = f"[设备: {serial}] {message}" if serial else message
         super().__init__(detail)
-        logger.error("设备连接异常: %s", detail)
 
 
 class PerceptionError(MobileAutomationError):
@@ -59,7 +58,6 @@ class PerceptionError(MobileAutomationError):
     """
     def __init__(self, message: str = "感知操作异常") -> None:
         super().__init__(message)
-        logger.error("感知异常: %s", message)
 
 
 class LLMServiceError(MobileAutomationError):
@@ -79,7 +77,6 @@ class LLMServiceError(MobileAutomationError):
         self.provider = provider
         detail = f"[提供商: {provider}] {message}" if provider else message
         super().__init__(detail)
-        logger.error("LLM 服务异常: %s", detail)
 
 
 class ActionExecutionError(MobileAutomationError):
@@ -95,7 +92,6 @@ class ActionExecutionError(MobileAutomationError):
     """
     def __init__(self, message: str = "动作执行异常") -> None:
         super().__init__(message)
-        logger.error("动作执行异常: %s", message)
 
 
 class LoopDetectedError(MobileAutomationError):
@@ -111,7 +107,6 @@ class LoopDetectedError(MobileAutomationError):
     """
     def __init__(self, message: str = "检测到死循环，任务已终止") -> None:
         super().__init__(message)
-        logger.warning("死循环检测异常: %s", message)
 
 
 class TimeoutError(MobileAutomationError):
@@ -131,4 +126,3 @@ class TimeoutError(MobileAutomationError):
         self.timeout_ms = timeout_ms
         detail = f"[超时: {timeout_ms}ms] {message}" if timeout_ms else message
         super().__init__(detail)
-        logger.error("超时异常: %s", detail)

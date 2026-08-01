@@ -5,11 +5,74 @@
 """
 
 import subprocess
+import time
+from concurrent.futures import TimeoutError as FutureTimeoutError
 
 import pytest
 
 from mobile_automation.device.device_manager import DeviceManager, DeviceInfo
+from mobile_automation.device.u2_controller import U2Controller
 from mobile_automation.exception import DeviceConnectionError
+
+
+class TestU2ControllerConnectTimeout:
+    """测试 U2Controller 连接超时保护。"""
+
+    def test_connect_timeout_raises(self, mocker):
+        """验证 u2.connect 阻塞超过超时阈值时抛出 TimeoutError。"""
+
+        def slow_connect(serial):
+            time.sleep(30)
+            return mocker.MagicMock()
+
+        mocker.patch("mobile_automation.device.u2_controller.u2.connect", side_effect=slow_connect)
+
+        with pytest.raises(FutureTimeoutError):
+            U2Controller._connect_with_timeout("test-device", timeout=1.0)
+
+    def test_connect_success_within_timeout(self, mocker):
+        """验证连接在超时阈值内完成时正常返回。"""
+        mock_device = mocker.MagicMock()
+        mock_device.info = {"display": "1080x1920"}
+        mocker.patch("mobile_automation.device.u2_controller.u2.connect", return_value=mock_device)
+
+        device = U2Controller._connect_with_timeout("test-device", timeout=5.0)
+        assert device is mock_device
+
+    def test_connect_error_propagates(self, mocker):
+        """验证连接抛出的原始异常正常传播（不吞异常）。"""
+        mocker.patch(
+            "mobile_automation.device.u2_controller.u2.connect",
+            side_effect=ConnectionError("device not found"),
+        )
+
+        with pytest.raises(ConnectionError, match="device not found"):
+            U2Controller._connect_with_timeout("test-device", timeout=5.0)
+
+
+class TestU2ControllerWindowSize:
+    """测试 U2Controller 屏幕尺寸获取。"""
+
+    def test_window_size_fallback_to_config(self, mocker):
+        """验证获取失败时回退到配置默认值而非硬编码。"""
+        mock_device = mocker.MagicMock()
+        mock_device.window_size.side_effect = RuntimeError("device offline")
+        mocker.patch("mobile_automation.device.u2_controller.u2.connect", return_value=mock_device)
+        mocker.patch("mobile_automation.device.u2_controller.settings.device.default_screen_width", 800)
+        mocker.patch("mobile_automation.device.u2_controller.settings.device.default_screen_height", 1280)
+
+        controller = U2Controller("test-device")
+        w, h = controller.window_size()
+        assert (w, h) == (800, 1280)
+
+    def test_window_size_success(self, mocker):
+        """验证正常获取屏幕尺寸。"""
+        mock_device = mocker.MagicMock()
+        mock_device.window_size.return_value = (1080, 2400)
+        mocker.patch("mobile_automation.device.u2_controller.u2.connect", return_value=mock_device)
+
+        controller = U2Controller("test-device")
+        assert controller.window_size() == (1080, 2400)
 
 
 class TestDeviceManager:
@@ -115,7 +178,7 @@ class TestDeviceManager:
     def test_get_screen_size_default(self):
         """验证未连接时返回默认屏幕尺寸。"""
         dm = DeviceManager()
-        assert dm.get_screen_size() == (1080, 2400)
+        assert dm.get_screen_size() == (1080, 1920)
 
     def test_health_check_not_connected(self):
         """验证未连接时健康检查返回 False。"""

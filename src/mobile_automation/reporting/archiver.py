@@ -114,10 +114,13 @@ class DataArchiver:
         task_id: str,
         report_dir: str = "reports",
     ) -> None:
-        self._task_id: str = task_id
+        # 清洗 task_id 中的非法文件名字符（Windows: < > : " / \ | ? *），
+        # 防止归档目录创建失败
+        safe_task_id = self._sanitize_task_id(task_id)
+        self._task_id: str = safe_task_id
         # 在 report_dir 下增加时间戳子目录
         timestamped = _timestamp_dir(report_dir)
-        self._base_dir: Path = timestamped / task_id
+        self._base_dir: Path = timestamped / safe_task_id
         self._step_archives: list[StepArchiveData] = []
         self._task_start_time: float = 0.0
 
@@ -127,6 +130,29 @@ class DataArchiver:
         except OSError as exc:
             logger.error("归档目录创建失败: %s", exc)
             raise
+
+    @staticmethod
+    def _sanitize_task_id(task_id: str) -> str:
+        """
+        清洗任务 ID 中的非法文件名字符。
+
+        Windows 文件名不允许的字符: < > : " / \\ | ? *
+        非法字符替换为下划线，空结果回退为 "task"。
+
+        参数
+        ----------
+        task_id : str
+            原始任务 ID。
+
+        返回
+        -------
+        str
+            清洗后可安全用于文件路径的任务 ID。
+        """
+        import re
+        cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", task_id).strip()
+        # 清洗后若无非下划线字符（如全为非法字符的 task_id），回退默认名
+        return cleaned[:120] if cleaned.strip("_") else "task"
 
     @property
     def base_dir(self) -> Path:
@@ -142,10 +168,17 @@ class DataArchiver:
         """
         保存任务级元数据到 task_meta.json。
 
+        写入失败时抛出 OSError（任务元数据是报告基石，不应静默丢失）。
+
         参数
         ----------
         meta : dict
             包含任务目标、状态、总步数等信息的字典。
+
+        抛出
+        ------
+        OSError
+            文件写入失败时抛出。
         """
         meta_path = self._base_dir / "task_meta.json"
         try:
@@ -154,6 +187,7 @@ class DataArchiver:
             logger.debug("任务元数据已保存: %s", meta_path)
         except OSError as exc:
             logger.error("任务元数据保存失败: %s", exc)
+            raise OSError(f"任务元数据写入失败: {meta_path} ({exc})") from exc
 
     def _get_step_dir(self, step_index: int) -> Path:
         """获取指定步骤的归档子目录。"""
@@ -166,7 +200,7 @@ class DataArchiver:
         step_index: int,
         image_bytes: bytes,
         after: bool = False,
-    ) -> Path:
+    ) -> Optional[Path]:
         """
         保存步骤截图到归档目录。
 
@@ -181,8 +215,8 @@ class DataArchiver:
 
         返回
         -------
-        Path
-            截图文件的完整路径。
+        Optional[Path]
+            截图文件的完整路径；写入失败时返回 None。
         """
         step_dir = self._get_step_dir(step_index)
         filename = "screenshot_after.png" if after else "screenshot.png"
@@ -194,10 +228,11 @@ class DataArchiver:
             logger.debug("截图已保存: %s (%d 字节)", filepath, len(image_bytes))
         except OSError as exc:
             logger.error("截图保存失败: %s", exc)
+            return None
 
         return filepath
 
-    def save_raw_xml(self, step_index: int, xml_str: str) -> Path:
+    def save_raw_xml(self, step_index: int, xml_str: str) -> Optional[Path]:
         """
         保存原始 UI 树 XML 到归档目录。
 
@@ -210,8 +245,8 @@ class DataArchiver:
 
         返回
         -------
-        Path
-            XML 文件的完整路径。
+        Optional[Path]
+            XML 文件的完整路径；写入失败时返回 None。
         """
         step_dir = self._get_step_dir(step_index)
         filepath = step_dir / "xml_raw.xml"
@@ -222,10 +257,11 @@ class DataArchiver:
             logger.debug("原始 XML 已保存: %s (%d 字符)", filepath, len(xml_str))
         except OSError as exc:
             logger.error("XML 保存失败: %s", exc)
+            return None
 
         return filepath
 
-    def save_structured_summary(self, step_index: int, summary: str) -> Path:
+    def save_structured_summary(self, step_index: int, summary: str) -> Optional[Path]:
         """
         保存结构化摘要文本到归档目录。
 
@@ -238,8 +274,8 @@ class DataArchiver:
 
         返回
         -------
-        Path
-            摘要文件的完整路径。
+        Optional[Path]
+            摘要文件的完整路径；写入失败时返回 None。
         """
         step_dir = self._get_step_dir(step_index)
         filepath = step_dir / "summary.txt"
@@ -250,10 +286,11 @@ class DataArchiver:
             logger.debug("结构化摘要已保存: %s (%d 字符)", filepath, len(summary))
         except OSError as exc:
             logger.error("摘要保存失败: %s", exc)
+            return None
 
         return filepath
 
-    def save_llm_request(self, step_index: int, messages: list[dict], attempt: int = 1) -> Path:
+    def save_llm_request(self, step_index: int, messages: list[dict], attempt: int = 1) -> Optional[Path]:
         """
         保存 LLM 请求消息到归档目录。
 
@@ -268,8 +305,8 @@ class DataArchiver:
 
         返回
         -------
-        Path
-            请求消息文件的完整路径。
+        Optional[Path]
+            请求消息文件的完整路径；写入失败时返回 None。
         """
         step_dir = self._get_step_dir(step_index)
         filename = "llm_request.json" if attempt <= 1 else f"llm_request_attempt_{attempt}.json"
@@ -282,10 +319,11 @@ class DataArchiver:
             logger.debug("LLM 请求已保存: %s", filepath)
         except OSError as exc:
             logger.error("LLM 请求保存失败: %s", exc)
+            return None
 
         return filepath
 
-    def save_llm_response(self, step_index: int, response: str, attempt: int = 1) -> Path:
+    def save_llm_response(self, step_index: int, response: str, attempt: int = 1) -> Optional[Path]:
         """
         保存 LLM 响应文本到归档目录。
 
@@ -300,8 +338,8 @@ class DataArchiver:
 
         返回
         -------
-        Path
-            响应文件的完整路径。
+        Optional[Path]
+            响应文件的完整路径；写入失败时返回 None。
         """
         step_dir = self._get_step_dir(step_index)
         filename = "llm_response.json" if attempt <= 1 else f"llm_response_attempt_{attempt}.json"
@@ -313,6 +351,7 @@ class DataArchiver:
             logger.debug("LLM 响应已保存: %s", filepath)
         except OSError as exc:
             logger.error("LLM 响应保存失败: %s", exc)
+            return None
 
         return filepath
 

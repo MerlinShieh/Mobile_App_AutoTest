@@ -5,13 +5,20 @@ uiautomator2 控制器封装模块。
 点击、输入、滑动、系统按键和应用管理等操作接口。
 """
 
+import io
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from typing import Optional
 
 import uiautomator2 as u2
+from PIL import Image
 
+from ..config import settings
 from ..logger import get_logger
 
 logger = get_logger(__name__)
+
+CONNECT_TIMEOUT_SECONDS: float = 30.0
+"""u2.connect 连接超时时间（秒），超时后由守护线程接管，主流程不再阻塞。"""
 
 
 class U2Controller:
@@ -29,11 +36,52 @@ class U2Controller:
 
     def __init__(self, serial: str) -> None:
         self._serial: str = serial
-        self._device: u2.Device = u2.connect(serial)
+        self._device: u2.Device = self._connect_with_timeout(serial)
         info = self._device.info
         if info is None:
             raise RuntimeError(f"uiautomator2 连接失败，设备序列号: {serial}")
         logger.info("U2Controller 初始化成功，设备: %s", serial)
+
+    @staticmethod
+    def _connect_with_timeout(
+        serial: str,
+        timeout: float = CONNECT_TIMEOUT_SECONDS,
+    ) -> u2.Device:
+        """
+        带超时保护的 u2.connect 连接。
+
+        设备不可达时 u2.connect 可能长时间阻塞，通过线程池 + 超时
+        保证主流程在 timeout 秒内返回。超时后底层线程作为守护线程
+        继续运行（shutdown(wait=False)），不阻塞也不泄漏到主流程。
+
+        参数
+        ----------
+        serial : str
+            目标设备的序列号。
+        timeout : float
+            连接超时秒数，默认 30s。
+
+        返回
+        -------
+        u2.Device
+            连接成功的设备对象。
+
+        抛出
+        ------
+        TimeoutError
+            连接超时（内置 concurrent.futures.TimeoutError）。
+        """
+        executor = ThreadPoolExecutor(max_workers=1)
+        try:
+            future = executor.submit(u2.connect, serial)
+            try:
+                return future.result(timeout=timeout)
+            except FutureTimeoutError:
+                raise TimeoutError(
+                    f"uiautomator2 连接超时（{timeout}s），设备序列号: {serial}"
+                ) from None
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
     def health_check(self) -> bool:
         """
@@ -60,6 +108,9 @@ class U2Controller:
         """
         获取屏幕宽高。
 
+        获取失败时回退到配置的默认屏幕尺寸（settings.device），
+        不再硬编码 1080x1920，保证非标准设备可用。
+
         返回
         -------
         tuple[int, int]
@@ -70,8 +121,13 @@ class U2Controller:
             logger.debug("屏幕尺寸: %dx%d", w, h)
             return w, h
         except Exception as exc:
-            logger.error("获取屏幕尺寸失败: %s", exc)
-            return 1080, 1920
+            fallback = (
+                settings.device.default_screen_width,
+                settings.device.default_screen_height,
+            )
+            logger.warning("获取屏幕尺寸失败，使用配置默认值 %dx%d: %s",
+                           fallback[0], fallback[1], exc)
+            return fallback
 
     def get_device_info(self) -> dict:
         """
@@ -95,6 +151,9 @@ class U2Controller:
         """
         截取当前设备屏幕。
 
+        uiautomator2 v3 的 screenshot() 可能返回 PIL Image（JpegImageFile）
+        或 bytes，本方法统一转换为 bytes 返回。
+
         参数
         ----------
         quality : int
@@ -103,10 +162,16 @@ class U2Controller:
         返回
         -------
         bytes
-            PNG 格式的原始图片字节数据，由调用方负责格式转换。
+            JPEG 格式的原始图片字节数据。
         """
         try:
-            data: bytes = self._device.screenshot()
+            raw = self._device.screenshot()
+            if isinstance(raw, Image.Image):
+                buf = io.BytesIO()
+                raw.save(buf, format="JPEG", quality=quality)
+                data = buf.getvalue()
+            else:
+                data = bytes(raw)
             logger.debug("u2 截图成功，大小: %d 字节", len(data))
             return data
         except Exception as exc:
@@ -146,6 +211,28 @@ class U2Controller:
             logger.debug("点击坐标 (%d, %d)", x, y)
         except Exception as exc:
             logger.error("点击坐标 (%d, %d) 失败: %s", x, y, exc)
+            raise
+
+    def long_click(self, x: int, y: int, duration: float = 0.5) -> None:
+        """
+        在屏幕指定坐标处执行长按。
+
+        封装 uiautomator2 的长按接口，避免调用方直接访问内部 _device。
+
+        参数
+        ----------
+        x : int
+            长按位置的 X 坐标（像素）。
+        y : int
+            长按位置的 Y 坐标（像素）。
+        duration : float
+            长按持续时长（秒），默认 0.5 秒。
+        """
+        try:
+            self._device.long_click(x, y, duration=duration)
+            logger.debug("长按坐标 (%d, %d) 时长 %.1fs", x, y, duration)
+        except Exception as exc:
+            logger.error("长按坐标 (%d, %d) 失败: %s", x, y, exc)
             raise
 
     def click_by_rid(self, resource_id: str) -> bool:
@@ -393,6 +480,9 @@ class U2Controller:
         """
         等待页面 UI 树稳定（连续两次 dump 内容一致）。
 
+        dump 异常时重置 prev_dump 为 None，避免基于过期快照误判页面
+        稳定；连续失败超过阈值（3 次）提前终止，避免设备断连时空转。
+
         参数
         ----------
         timeout_ms : int
@@ -401,23 +491,34 @@ class U2Controller:
         返回
         -------
         bool
-            True 表示在超时前页面已稳定，False 表示超时。
+            True 表示在超时前页面已稳定，False 表示超时或连续失败。
         """
         import time
 
         deadline = time.time() + timeout_ms / 1000.0
         prev_dump: Optional[str] = None
         sleep_interval = 0.5
+        consecutive_failures = 0
+        max_consecutive_failures = 3
 
         while time.time() < deadline:
             try:
                 current_dump = self.dump_ui()
+                consecutive_failures = 0
                 if prev_dump is not None and current_dump == prev_dump:
                     logger.debug("页面已稳定，耗时: %.1f 秒", time.time() - (deadline - timeout_ms / 1000.0))
                     return True
                 prev_dump = current_dump
             except Exception as exc:
-                logger.warning("等待稳定期间 UI dump 失败: %s", exc)
+                # 连续失败时重置快照，防止用旧快照误判稳定
+                prev_dump = None
+                consecutive_failures += 1
+                logger.warning("等待稳定期间 UI dump 失败 (%d/%d): %s",
+                               consecutive_failures, max_consecutive_failures, exc)
+                if consecutive_failures >= max_consecutive_failures:
+                    logger.error("等待稳定期间连续 %d 次 dump 失败，设备可能已断连，提前终止",
+                                 max_consecutive_failures)
+                    return False
             time.sleep(sleep_interval)
 
         logger.warning("等待页面稳定超时 (%d ms)", timeout_ms)

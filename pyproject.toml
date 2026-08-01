@@ -5,27 +5,25 @@ description = "基于 Qwen-VL 多模态模型的移动端 AI 自动化操作框�
 requires-python = ">=3.10"
 
 dependencies = [
-    "openai>=1.0.0",
-    "anthropic>=0.30.0",
-    "uiautomator2>=2.16.0",
-    "Pillow>=10.0.0",
-    "opencv-python>=4.8.0",
-    "scikit-image>=0.21.0",
-    "lxml>=4.9.0",
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "python-dotenv>=1.0.0",
+    "openai>=2.44.0",
+    "anthropic>=0.112.0",
+    "uiautomator2>=3.7.0",
+    "adbutils>=2.12.0",
+    "Pillow>=12.2.0",
+    "opencv-python>=4.13.0",
+    "scikit-image>=0.26.0",
+    "lxml>=6.1.0",
+    "pydantic>=2.13.0",
+    "pydantic-settings>=2.14.0",
+    "python-dotenv>=1.1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-mock>=3.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
+    "pytest>=9.0.0",
+    "pytest-mock>=3.15.0",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.0.0",
 ]
 
 [build-system]
@@ -34,3 +32,23 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["mobile_automation"]
+branch = true
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 60
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.",
+]

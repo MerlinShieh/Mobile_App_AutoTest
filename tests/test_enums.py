@@ -25,18 +25,28 @@ class TestActionType:
         assert ActionType.DOUBLE_CLICK.value == "double_click"
         assert ActionType.LONG_CLICK.value == "long_click"
         assert ActionType.TYPE.value == "type"
+        assert ActionType.CLEAR_TEXT.value == "clear_text"
         assert ActionType.SWIPE.value == "swipe"
+        assert ActionType.SWIPE_POINT.value == "swipe_point"
         assert ActionType.SCROLL.value == "scroll"
         assert ActionType.BACK.value == "back"
         assert ActionType.HOME.value == "home"
+        assert ActionType.RECENT_APPS.value == "recent_apps"
         assert ActionType.WAIT.value == "wait"
+        assert ActionType.SCREENSHOT.value == "screenshot"
         assert ActionType.OPEN_APP.value == "open_app"
+        assert ActionType.CLOSE_APP.value == "close_app"
         assert ActionType.TERMINATE.value == "terminate"
         assert ActionType.VERIFY.value == "verify"
+        assert ActionType.LOCK_SCREEN.value == "lock_screen"
+        assert ActionType.OPEN_NOTIFICATIONS.value == "open_notifications"
+        assert ActionType.ROTATE_SCREEN.value == "rotate_screen"
+        assert ActionType.VOLUME_UP.value == "volume_up"
+        assert ActionType.VOLUME_DOWN.value == "volume_down"
 
     def test_total_members(self):
         """验证 ActionType 成员数量完整。"""
-        assert len(ActionType) == 17
+        assert len(ActionType) == 22
 
     def test_from_string_valid(self):
         """测试通过字符串值创建枚举。"""

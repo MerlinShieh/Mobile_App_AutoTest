@@ -60,6 +60,16 @@ class ActionType(str, Enum):
     """终止当前任务"""
     VERIFY = "verify"
     """验证判断操作，不会实际操作设备，仅用于向系统返回验证结论（params.match 表示是否匹配）"""
+    LOCK_SCREEN = "lock_screen"
+    """锁定/熄屏操作，通过 ADB 发送电源键事件"""
+    OPEN_NOTIFICATIONS = "open_notifications"
+    """打开系统通知栏，通过 ADB statusbar 命令展开通知面板"""
+    ROTATE_SCREEN = "rotate_screen"
+    """旋转屏幕方向，通过 direction 字段指定目标方向（portrait/landscape/reverse_portrait/reverse_landscape）"""
+    VOLUME_UP = "volume_up"
+    """调高媒体音量，通过 ADB 发送音量+键事件"""
+    VOLUME_DOWN = "volume_down"
+    """调低媒体音量，通过 ADB 发送音量-键事件"""
 
 
 class StepStatus(str, Enum):

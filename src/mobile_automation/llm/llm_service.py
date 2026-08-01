@@ -11,6 +11,7 @@ from ..config import settings
 from ..logger import get_logger
 from .base import LLMAdapter, LLMMessage
 from .claude_adapter import ClaudeAdapter
+from .mimo_adapter import MiMoAdapter
 from .openai_adapter import OpenAIAdapter
 from .qwen_adapter import QwenAdapter
 from .zhipu_adapter import ZhipuAdapter
@@ -37,6 +38,8 @@ class LLMServiceFactory:
         "openai": OpenAIAdapter,
         "anthropic": ClaudeAdapter,
         "zhipu": ZhipuAdapter,
+        "mimo": MiMoAdapter,
+        "local": OpenAIAdapter,
     }
     """提供商名称到 Adapter 类的映射字典。"""
 
@@ -68,7 +71,8 @@ class LLMServiceFactory:
                 f"不支持的 LLM 提供商: {provider}，可选: {list(cls._adapters.keys())}"
             )
         logger.info("LLMServiceFactory 创建 Adapter: provider=%s, cls=%s", provider, adapter_cls.__name__)
-        return adapter_cls()
+        # 将 provider 名称传给适配器，供其从 settings.models.providers 读取配置
+        return adapter_cls(provider=provider)
 
     @classmethod
     def register(cls, name: str, adapter_cls: type[LLMAdapter]) -> None:

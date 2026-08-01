@@ -142,3 +142,66 @@ class TestDecisionPromptBuilderCompression:
         assert isinstance(messages[1].content, str)
         assert messages[2].role == "user"
         assert isinstance(messages[2].content, list)
+
+
+class TestDecisionPromptInputFlow:
+    """验证系统 Prompt 中输入流程强化的关键指引。"""
+
+    @pytest.fixture
+    def builder(self):
+        return DecisionPromptBuilder()
+
+    def test_system_prompt_contains_multi_step_flow(self, builder):
+        """验证 system prompt 强调输入是多步骤流程。"""
+        messages = builder.build(
+            user_goal="搜索手机",
+            screenshot=SAMPLE_SCREENSHOT,
+            structured_summary=SAMPLE_SUMMARY,
+            history=None,
+            compression_strategy="none",
+        )
+        system_text = messages[0].content
+        assert "点击输入框只是第一步" in system_text
+        assert "必须继续 type" in system_text
+
+    def test_system_prompt_contains_keyboard_guidance(self, builder):
+        """验证 system prompt 包含软键盘弹出是正常现象的指引。"""
+        messages = builder.build(
+            user_goal="搜索手机",
+            screenshot=SAMPLE_SCREENSHOT,
+            structured_summary=SAMPLE_SUMMARY,
+            history=None,
+            compression_strategy="none",
+        )
+        system_text = messages[0].content
+        assert "软键盘会弹出" in system_text
+        assert "正常现象" in system_text
+        assert "误以为页面出错" in system_text
+
+    def test_system_prompt_contains_clear_text_guidance(self, builder):
+        """验证 system prompt 包含预填内容先清空的指引。"""
+        messages = builder.build(
+            user_goal="搜索手机",
+            screenshot=SAMPLE_SCREENSHOT,
+            structured_summary=SAMPLE_SUMMARY,
+            history=None,
+            compression_strategy="none",
+        )
+        system_text = messages[0].content
+        assert "clear_text" in system_text
+        assert "预填内容" in system_text
+
+    def test_no_reasoning_prompt_also_contains_input_guidance(self, builder):
+        """验证关闭思维链时的 system prompt 同样包含输入流程指引。"""
+        messages = builder.build(
+            user_goal="搜索手机",
+            screenshot=SAMPLE_SCREENSHOT,
+            structured_summary=SAMPLE_SUMMARY,
+            history=None,
+            compression_strategy="none",
+            enable_reasoning=False,
+        )
+        system_text = messages[0].content
+        assert "点击输入框只是第一步" in system_text
+        assert "软键盘会弹出" in system_text
+        assert "clear_text" in system_text

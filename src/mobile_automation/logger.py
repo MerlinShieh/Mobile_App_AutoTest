@@ -6,6 +6,10 @@
 确保日志格式和输出行为一致。
 
 日志文件默认存储在 logs/yy_mm_dd_hh_mm_ss/ 时间戳子目录下。
+
+设计参考:
+- Open-AutoGLM: 简洁的日志配置 + 步骤级进度输出
+- mobile-mcp: 结构化日志 + 文件行号追踪
 """
 
 import logging
@@ -39,6 +43,31 @@ def _timestamp_dir(base: str) -> Path:
 
 _LOG_INITIALIZED: bool = False
 """全局标志位，防止重复初始化"""
+
+# ANSI 颜色代码
+_COLORS = {
+    "DEBUG": "\033[36m",     # 青色
+    "INFO": "\033[32m",      # 绿色
+    "WARNING": "\033[33m",   # 黄色
+    "ERROR": "\033[31m",     # 红色
+    "CRITICAL": "\033[35m",  # 紫色
+}
+_RESET = "\033[0m"
+
+
+class _ColoredFormatter(logging.Formatter):
+    """
+    带颜色的日志格式化器。
+
+    在终端输出中根据日志级别添加 ANSI 颜色，文件输出中不包含颜色代码。
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        formatted = super().format(record)
+        if hasattr(sys.stdout, "isatty") and sys.stdout.isatty():
+            color = _COLORS.get(record.levelname, _RESET)
+            return f"{color}{formatted}{_RESET}"
+        return formatted
 
 
 def setup_logger(
@@ -91,7 +120,7 @@ def setup_logger(
     log_file = log_path / "mobile_automation.log"
     level = getattr(logging, log_level.upper(), logging.DEBUG)
 
-    # ---------- 文件处理器（按大小轮转） ----------
+    # ---------- 文件处理器（按大小轮转，无颜色） ----------
     file_handler = RotatingFileHandler(
         filename=str(log_file),
         maxBytes=rotation_mb * 1024 * 1024,
@@ -99,18 +128,20 @@ def setup_logger(
         encoding="utf-8",
     )
     file_handler.setLevel(level)
-
-    # ---------- 控制台处理器 ----------
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(level)
-
-    # ---------- 格式化器 ----------
-    fmt = logging.Formatter(
+    file_fmt = logging.Formatter(
         fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(filename)s:%(lineno)d | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    file_handler.setFormatter(fmt)
-    console_handler.setFormatter(fmt)
+    file_handler.setFormatter(file_fmt)
+
+    # ---------- 控制台处理器（带颜色） ----------
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(level)
+    console_fmt = _ColoredFormatter(
+        fmt="%(asctime)s %(levelname)-8s %(name)s | %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    console_handler.setFormatter(console_fmt)
 
     # ---------- 移除已有处理器避免重复 ----------
     root_logger.handlers.clear()
@@ -148,3 +179,53 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
     if name:
         return logging.getLogger(f"mobile_automation.{name}")
     return logging.getLogger("mobile_automation")
+
+
+def log_step_progress(step: int, total: int, action: str, reason: str = "") -> None:
+    """
+    打印步骤级进度日志。
+
+    格式: [1/30] click #3 → 点击搜索框
+
+    参考 Open-AutoGLM 的步骤输出格式。
+
+    参数
+    ----------
+    step : int
+        当前步骤序号。
+    total : int
+        总步骤数上限。
+    action : str
+        动作描述，如 "click #3"。
+    reason : str
+        操作理由，可选。
+    """
+    logger = get_logger("progress")
+    msg = f"[{step}/{total}] {action}"
+    if reason:
+        msg += f" → {reason}"
+    logger.info(msg)
+
+
+def log_task_start(goal: str, device: str = "", max_steps: int = 30) -> None:
+    """打印任务启动横幅"""
+    logger = get_logger("progress")
+    logger.info("=" * 50)
+    logger.info(f"  🎯 任务: {goal}")
+    if device:
+        logger.info(f"  📱 设备: {device}")
+    logger.info(f"  📊 最大步数: {max_steps}")
+    logger.info("=" * 50)
+
+
+def log_task_end(status: str, steps: int, tokens: int, duration: float) -> None:
+    """打印任务结束摘要"""
+    logger = get_logger("progress")
+    status_emoji = {"completed": "✅", "failed": "❌", "aborted": "⚠️"}.get(status, "❓")
+    logger.info("")
+    logger.info("=" * 50)
+    logger.info(f"  {status_emoji} 状态: {status}")
+    logger.info(f"  📈 执行步数: {steps}")
+    logger.info(f"  🔢 Token消耗: {tokens}")
+    logger.info(f"  ⏱️  耗时: {duration:.1f}s")
+    logger.info("=" * 50)

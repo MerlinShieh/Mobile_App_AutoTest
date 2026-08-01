@@ -7,9 +7,10 @@ OpenAI GPT-4o 适配器 —— 调用 OpenAI 标准 API。
 
 from typing import Any, Optional
 
-from openai import OpenAI
+from openai import APIError, OpenAI
 
 from ..config import settings
+from ..exception import LLMServiceError
 from ..logger import get_logger
 from .base import LLMAdapter, LLMMessage
 
@@ -38,24 +39,44 @@ class OpenAIAdapter(LLMAdapter):
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         model_name: Optional[str] = None,
+        provider: Optional[str] = None,
     ) -> None:
         """
         初始化 OpenAIAdapter。
 
+        优先从 settings.models.providers 读取配置（多模型架构），
+        未找到时回退到 settings.llm（向后兼容）。
+
         参数
         ----------
         api_key : Optional[str]
-            OpenAI API 密钥，未传入时从 settings.llm.api_key 读取。
+            API 密钥，未传入时从配置读取。
         base_url : Optional[str]
-            API 请求基础地址，未传入时从 settings.llm.base_url 读取。
+            API 请求基础地址，未传入时从配置读取。
         model_name : Optional[str]
-            模型名称，未传入时从 settings.llm.model_name 读取。
+            模型名称，未传入时从配置读取。
+        provider : Optional[str]
+            提供商名称，用于从 settings.models.providers 查找配置。
         """
-        self._api_key: str = api_key or settings.llm.api_key
-        self._base_url: str = base_url or settings.llm.base_url
-        self._model: str = model_name or settings.llm.model_name or "gpt-4o"
+        provider_cfg = settings.models.providers.get(provider or "") if provider else None
+        if provider_cfg:
+            self._api_key: str = api_key or provider_cfg.api_key
+            self._base_url: str = base_url or provider_cfg.base_url
+            # 从模型注册表查找该 provider 的模型名称
+            self._model: str = model_name or ""
+            if not self._model:
+                for model_entry in settings.models.models.values():
+                    if model_entry.provider == provider:
+                        self._model = model_entry.model_name
+                        break
+            if not self._model:
+                self._model = "gpt-4o"
+        else:
+            self._api_key = api_key or settings.llm.api_key
+            self._base_url = base_url or settings.llm.base_url
+            self._model = model_name or settings.llm.model_name or "gpt-4o"
 
-        logger.info("OpenAIAdapter 初始化: model=%s", self._model)
+        logger.info("OpenAIAdapter 初始化: model=%s, base_url=%s", self._model, self._base_url)
 
         self._client: OpenAI = OpenAI(
             api_key=self._api_key,
@@ -101,42 +122,39 @@ class OpenAIAdapter(LLMAdapter):
 
         logger.debug("OpenAIAdapter.chat 发送消息: %d 条, model=%s", len(openai_messages), self._model)
 
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=openai_messages,
-            max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
-            temperature=kwargs.get("temperature", settings.llm.temperature),
-        )
+        # 注意：不校验 API Key 空值——local provider（本地 llama-server）
+        # 复用本适配器且无需认证，空 Key 是合法场景。
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=openai_messages,
+                max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
+                temperature=kwargs.get("temperature", settings.llm.temperature),
+                timeout=kwargs.get("timeout", settings.llm.request_timeout),
+            )
+        except APIError as exc:
+            logger.error("OpenAI API 调用失败: %s", exc)
+            raise LLMServiceError(f"OpenAI API 调用失败: {exc}", provider="openai") from exc
+        except Exception as exc:
+            logger.error("OpenAI 调用发生未知异常: %s", exc)
+            raise LLMServiceError(f"OpenAI 调用异常: {exc}", provider="openai") from exc
+
+        if not response.choices:
+            raise LLMServiceError("OpenAI API 返回空响应（无 choices）", provider="openai")
 
         result: str = response.choices[0].message.content or ""
         logger.debug("OpenAIAdapter.chat 收到回复: %d 字符", len(result))
         return result
 
-    def count_tokens(self, messages: list[LLMMessage]) -> int:
+    def close(self) -> None:
         """
-        估算 OpenAI 消息列表的 Token 消耗数。
-
-        文本按字符数的一半估算，图片按每张 1000 Token 估算。
-
-        参数
-        ----------
-        messages : list[LLMMessage]
-            待估算的消息列表。
+        释放 OpenAI SDK client 的底层连接池资源。
 
         返回
-        -------
-        int
-            估算的 Token 总数。
+        ------
+        None
         """
-        total: int = 0
-        for msg in messages:
-            if isinstance(msg.content, str):
-                total += len(msg.content) // 2
-            elif isinstance(msg.content, list):
-                for item in msg.content:
-                    if item.get("type") == "text":
-                        total += len(item.get("text", "")) // 2
-                    elif item.get("type") == "image_url":
-                        total += 1000
-        logger.debug("OpenAIAdapter.count_tokens: %d 条消息共约 %d token", len(messages), total)
-        return total
+        try:
+            self._client.close()
+        except Exception as exc:
+            logger.debug("OpenAIAdapter.close 异常（忽略）: %s", exc)

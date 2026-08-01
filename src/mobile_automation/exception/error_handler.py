@@ -6,7 +6,7 @@
 返回分类信息和推荐的恢复动作。
 
 异常分类对照表
---------------
+-------------
 | 分类         | 对应异常类型                    | 推荐动作       |
 |-------------|----------------------------------|----------------|
 | connection  | DeviceConnectionError            | 自动重连       |
@@ -16,9 +16,19 @@
 | loop        | LoopDetectedError                | 终止任务       |
 | timeout     | TimeoutError                     | 按策略等待/终止 |
 | unknown     | 其他 Exception                   | 上报调用方      |
+
+已实现的恢复动作：
+- reconnect：通过注入的 DeviceManager 执行设备重连
+- retry_backoff：指数退避（含最大延迟上限）
+- abort / wait_or_abort：语义化返回，由上层执行终止或等待
+- switch_capture / switch_location：依赖上层执行上下文，返回 False
+  由上层决定处理方式（避免越权修改框架状态）
 """
 
-from typing import Any, Optional
+import functools
+import time
+from builtins import TimeoutError as BuiltinTimeoutError
+from typing import Any, Callable, Optional
 
 from ..logger import get_logger
 from .exceptions import (
@@ -42,11 +52,17 @@ class ErrorHandler:
     提供 classify 方法分类异常并返回恢复建议，以及 handle 方法
     执行实际的恢复动作。支持注册自定义异常类型的处理逻辑。
 
+    参数
+    ----------
+    device_manager : Optional[object]
+        设备管理器实例（可选），用于执行设备重连恢复。
+        仅需提供 connect(serial=None) 和 get_serial() 接口。
+
     使用方式
     --------
-    >>> handler = ErrorHandler()
+    >>> handler = ErrorHandler(device_manager=dm)
     >>> category, action = handler.classify(exc)
-    >>> handler.handle(exc, category, action)
+    >>> recovered = handler.handle(exc, category, action)
     """
 
     ERROR_MAP: dict[type, str] = {
@@ -70,8 +86,17 @@ class ErrorHandler:
     }
     """异常分类到推荐恢复动作的映射。"""
 
-    def __init__(self) -> None:
-        """初始化 ErrorHandler。"""
+    RETRY_BASE_DELAY: float = 1.0
+    """指数退避基础延迟（秒）。"""
+    RETRY_BACKOFF_FACTOR: float = 2.0
+    """指数退避因子。"""
+    RETRY_MAX_DELAY: float = 30.0
+    """指数退避最大延迟上限（秒），防止无限等待。"""
+
+    def __init__(self, device_manager: Optional[Any] = None) -> None:
+        """初始化 ErrorHandler，可选注入设备管理器用于重连恢复。"""
+        self._device_manager: Optional[Any] = device_manager
+        self._retry_attempts: int = 0
         logger.debug("ErrorHandler 初始化完成")
 
     def classify(self, exc: Exception) -> tuple[str, str]:
@@ -140,7 +165,7 @@ class ErrorHandler:
 
     def _handle_reconnect(self, exc: Exception) -> bool:
         """
-        处理设备重连。
+        处理设备重连（通过注入的 DeviceManager 执行）。
 
         参数
         ----------
@@ -152,12 +177,23 @@ class ErrorHandler:
         bool
             重连是否成功。
         """
-        logger.info("执行设备重连: %s", exc)
-        return False
+        if self._device_manager is None:
+            logger.warning("未注入 DeviceManager，无法执行设备重连: %s", exc)
+            return False
+        try:
+            serial = self._device_manager.get_serial() or None
+            logger.info("执行设备重连: serial=%s", serial)
+            return bool(self._device_manager.connect(serial))
+        except Exception as exc2:
+            logger.error("设备重连失败: %s", exc2)
+            return False
 
     def _handle_switch_capture(self, exc: Exception) -> bool:
         """
-        处理截图方式切换。
+        处理截图方式切换（u2 -> ADB）。
+
+        截图方式切换依赖上层执行上下文，ErrorHandler 不越权修改
+        框架状态，返回 False 交由上层决策。
 
         参数
         ----------
@@ -167,14 +203,14 @@ class ErrorHandler:
         返回
         -------
         bool
-            切换是否成功。
+            始终返回 False（由上层决定切换策略）。
         """
-        logger.info("执行截图方式切换（u2 -> ADB）: %s", exc)
+        logger.warning("感知异常，建议切换截图方式（u2 -> ADB），由上层决策: %s", exc)
         return False
 
     def _handle_retry_backoff(self, exc: Exception) -> bool:
         """
-        处理 LLM 调用重试（指数退避）。
+        处理 LLM 调用重试（指数退避，含最大延迟上限）。
 
         参数
         ----------
@@ -184,14 +220,24 @@ class ErrorHandler:
         返回
         -------
         bool
-            是否启动重试流程。
+            是否启动重试流程（执行退避等待后返回 True）。
         """
-        logger.info("执行 LLM 指数退避重试: %s", exc)
+        delay = min(
+            self.RETRY_BASE_DELAY * (self.RETRY_BACKOFF_FACTOR ** self._retry_attempts),
+            self.RETRY_MAX_DELAY,
+        )
+        self._retry_attempts += 1
+        logger.warning("LLM 指数退避重试: 第 %d 次，等待 %.1fs (%s)",
+                       self._retry_attempts, delay, exc)
+        time.sleep(delay)
         return True
 
     def _handle_switch_location(self, exc: Exception) -> bool:
         """
-        处理定位方式切换。
+        处理定位方式切换（resource-id -> 坐标）。
+
+        定位方式切换依赖上层执行上下文，ErrorHandler 不越权修改
+        框架状态，返回 False 交由上层决策。
 
         参数
         ----------
@@ -201,10 +247,10 @@ class ErrorHandler:
         返回
         -------
         bool
-            是否启动切换流程。
+            始终返回 False（由上层决定切换策略）。
         """
-        logger.info("执行定位切换（resource-id -> 坐标）: %s", exc)
-        return True
+        logger.warning("执行异常，建议切换定位方式（resource-id -> 坐标），由上层决策: %s", exc)
+        return False
 
     def _handle_abort(self, exc: Exception) -> bool:
         """
@@ -241,7 +287,7 @@ class ErrorHandler:
         return True
 
     @staticmethod
-    def wrap_error(func: callable) -> callable:
+    def wrap_error(func: Callable) -> Callable:
         """
         装饰器：将被装饰函数抛出的异常包装为框架自定义异常。
 
@@ -251,12 +297,14 @@ class ErrorHandler:
         ... def risky_operation():
         ...     raise ConnectionError("设备离线")
         """
+        @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return func(*args, **kwargs)
             except MobileAutomationError:
                 raise
-            except TimeoutError as exc:
+            except BuiltinTimeoutError as exc:
+                # 显式区分内置超时（如 future.result(timeout)）与自定义超时
                 raise TimeoutError(str(exc)) from exc
             except ConnectionError as exc:
                 raise DeviceConnectionError(str(exc)) from exc
@@ -265,7 +313,7 @@ class ErrorHandler:
         return wrapper
 
     @staticmethod
-    def safe_call(func: callable, default_return: Any = None, log_level: str = "error") -> Any:
+    def safe_call(func: Callable, default_return: Any = None, log_level: str = "error") -> Any:
         """
         安全调用函数：捕获所有异常并记录日志，返回默认值。
 

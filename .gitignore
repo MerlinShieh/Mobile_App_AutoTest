@@ -9,6 +9,8 @@ reports/
 .idea/
 .qwen/
 *.log
+.coverage
+htmlcov/
 
 *.egg-info/
 dist/

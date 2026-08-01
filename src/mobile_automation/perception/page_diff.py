@@ -6,11 +6,14 @@
 """
 
 import time
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from ..config import settings
 from ..logger import get_logger
 from ..models.perception import UINode, UITree, PageChangeResult
+
+if TYPE_CHECKING:
+    from .ui_tree import UITreeExtractor
 
 logger = get_logger(__name__)
 
@@ -81,10 +84,13 @@ class PageChangeDetector:
         structural_score, changed_nodes = self._structural_diff(current_tree, self._prev_tree)
         visual_score = self._visual_diff(current_screenshot, self._prev_screenshot)
 
+        # 视觉变化极大但结构变化极小 → 滚动场景（预加载列表结构不变，画面滚动）
+        is_scroll = visual_score > 0.9 and structural_score < 0.1
+
         combined = structural_score * self.STRUCTURAL_WEIGHT + visual_score * self.VISUAL_WEIGHT
         # 结构差异必须达到阈值的一半以上，防止时钟/通知等微小变化被误判为页面变化
         structural_min = self.CHANGE_THRESHOLD * 0.5
-        has_changed = combined > self.CHANGE_THRESHOLD and structural_score > structural_min
+        has_changed = is_scroll or (combined > self.CHANGE_THRESHOLD and structural_score > structural_min)
         verdict = (
             f"结构差异({structural_score:.2f}) 视觉差异({visual_score:.2f}) 综合({combined:.2f})"
         )
@@ -185,12 +191,17 @@ class PageChangeDetector:
             import cv2
             import numpy as np
 
-            def b64_to_img(b64_str: str) -> np.ndarray:
+            def b64_to_img(b64_str: str) -> Optional[np.ndarray]:
                 raw = np.frombuffer(base64.b64decode(b64_str), dtype=np.uint8)
-                return cv2.imdecode(raw, cv2.IMREAD_GRAYSCALE)
+                img = cv2.imdecode(raw, cv2.IMREAD_GRAYSCALE)
+                return img if img is not None else None
 
             img1 = b64_to_img(cur_b64)
             img2 = b64_to_img(prev_b64)
+
+            if img1 is None or img2 is None:
+                logger.warning("视觉差异检测：截图 Base64 解码失败，跳过本次比较")
+                return 0.0
 
             if img1.shape != img2.shape:
                 img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))

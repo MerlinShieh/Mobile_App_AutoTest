@@ -7,9 +7,10 @@
 
 from typing import Any, Optional
 
-from openai import OpenAI
+from openai import APIError, OpenAI
 
 from ..config import settings
+from ..exception import LLMServiceError
 from ..logger import get_logger
 from .base import LLMAdapter, LLMMessage
 
@@ -38,22 +39,48 @@ class ZhipuAdapter(LLMAdapter):
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         model_name: Optional[str] = None,
+        provider: Optional[str] = None,
     ) -> None:
         """
         初始化 ZhipuAdapter。
 
+        优先从 settings.models.providers["zhipu"] 读取配置（多模型架构），
+        未配置时回退到 settings.llm（向后兼容旧架构）。
+
         参数
         ----------
         api_key : Optional[str]
-            智谱 API 密钥，未传入时从 settings.llm.api_key 读取。
+            智谱 API 密钥，未传入时从配置读取。
         base_url : Optional[str]
-            API 请求基础地址，未传入时从 settings.llm.base_url 读取。
+            API 请求基础地址，未传入时从配置读取。
         model_name : Optional[str]
-            模型名称，未传入时从 settings.llm.model_name 读取。
+            模型名称，未传入时从配置读取。
+        provider : Optional[str]
+            提供商名称，默认 "zhipu"。
         """
-        self._api_key: str = api_key or settings.llm.api_key
-        self._base_url: str = base_url or settings.llm.base_url or "https://open.bigmodel.cn/api/paas/v4/"
-        self._model: str = model_name or settings.llm.model_name or "glm-4.1v-thinking-flash"
+        provider_name = provider or "zhipu"
+        provider_cfg = settings.models.providers.get(provider_name)
+
+        if provider_cfg:
+            self._api_key: str = api_key or provider_cfg.api_key
+            self._base_url: str = base_url or provider_cfg.base_url or "https://open.bigmodel.cn/api/paas/v4/"
+            # 从模型注册表查找本 provider 的第一个模型
+            self._model: str = model_name or ""
+            for model_entry in settings.models.models.values():
+                if model_entry.provider == provider_name:
+                    self._model = self._model or model_entry.model_name
+                    break
+            self._model = self._model or "glm-4.1v-thinking-flash"
+        else:
+            self._api_key = api_key or settings.llm.api_key
+            self._base_url = base_url or settings.llm.base_url or "https://open.bigmodel.cn/api/paas/v4/"
+            self._model = model_name or settings.llm.model_name or "glm-4.1v-thinking-flash"
+
+        if not self._api_key:
+            raise ValueError(
+                "智谱 API Key 未配置。请在 .env 中设置 LLM_API_KEY 或 "
+                "MODELS__PROVIDERS__ZHIPU__API_KEY。"
+            )
 
         logger.info("ZhipuAdapter 初始化: model=%s, base_url=%s", self._model, self._base_url)
 
@@ -104,44 +131,37 @@ class ZhipuAdapter(LLMAdapter):
 
         logger.debug("ZhipuAdapter.chat 发送消息: %d 条, model=%s", len(openai_messages), self._model)
 
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=openai_messages,
-            max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
-            temperature=kwargs.get("temperature", settings.llm.temperature),
-            timeout=kwargs.get("timeout", settings.llm.request_timeout),
-        )
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=openai_messages,
+                max_tokens=kwargs.get("max_tokens", settings.llm.max_tokens),
+                temperature=kwargs.get("temperature", settings.llm.temperature),
+                timeout=kwargs.get("timeout", settings.llm.request_timeout),
+            )
+        except APIError as exc:
+            logger.error("智谱 API 调用失败: %s", exc)
+            raise LLMServiceError(f"智谱 API 调用失败: {exc}", provider="zhipu") from exc
+        except Exception as exc:
+            logger.error("智谱调用发生未知异常: %s", exc)
+            raise LLMServiceError(f"智谱调用异常: {exc}", provider="zhipu") from exc
+
+        if not response.choices:
+            raise LLMServiceError("智谱 API 返回空响应（无 choices）", provider="zhipu")
 
         result: str = response.choices[0].message.content or ""
         logger.debug("ZhipuAdapter.chat 收到回复: %d 字符", len(result))
         return result
 
-    def count_tokens(self, messages: list[LLMMessage]) -> int:
+    def close(self) -> None:
         """
-        估算智谱消息列表的 Token 消耗数。
-
-        文本按字符数的一半估算（约 2 字符/Token），
-        图片按每张 1000 Token 估算。
-
-        参数
-        ----------
-        messages : list[LLMMessage]
-            待估算的消息列表。
+        释放 OpenAI SDK client 的底层连接池资源。
 
         返回
-        -------
-        int
-            估算的 Token 总数。
+        ------
+        None
         """
-        total: int = 0
-        for msg in messages:
-            if isinstance(msg.content, str):
-                total += len(msg.content) // 2
-            elif isinstance(msg.content, list):
-                for item in msg.content:
-                    if item.get("type") == "text":
-                        total += len(item.get("text", "")) // 2
-                    elif item.get("type") == "image_url":
-                        total += 1000
-        logger.debug("ZhipuAdapter.count_tokens: %d 条消息共约 %d token", len(messages), total)
-        return total
+        try:
+            self._client.close()
+        except Exception as exc:
+            logger.debug("ZhipuAdapter.close 异常（忽略）: %s", exc)

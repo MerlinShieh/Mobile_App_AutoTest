@@ -14,7 +14,7 @@ element_id 优先定位流程：
   5. 失败后回退到 (x, y) 坐标点击
 """
 
-from typing import Optional
+from typing import Callable, Optional
 
 from ..config import settings
 from ..device.device_manager import DeviceManager
@@ -53,7 +53,7 @@ class ActionExecutor:
             设备管理器实例。
         """
         self._dm: DeviceManager = device_manager
-        self._executors: dict[ActionType, object] = {
+        self._executors: dict[ActionType, ClickExecutor | TypeExecutor | SwipeExecutor | WaitExecutor] = {
             ActionType.CLICK: ClickExecutor(device_manager),
             ActionType.DOUBLE_CLICK: ClickExecutor(device_manager),
             ActionType.LONG_CLICK: ClickExecutor(device_manager),
@@ -123,7 +123,11 @@ class ActionExecutor:
 
     def _execute_system_action(self, action: Action) -> bool:
         """
-        执行系统级操作（BACK / HOME / RECENT_APPS / OPEN_APP / CLOSE_APP / TERMINATE / VERIFY）。
+        执行系统级操作（BACK / HOME / RECENT_APPS / OPEN_APP / CLOSE_APP /
+        LOCK_SCREEN / OPEN_NOTIFICATIONS / ROTATE_SCREEN / VOLUME_UP / VOLUME_DOWN
+        / TERMINATE / VERIFY 等）。
+
+        部分操作（熄屏、通知栏、旋转、音量）通过 ADB 执行，其余通过 U2Controller。
 
         参数
         ----------
@@ -137,13 +141,19 @@ class ActionExecutor:
         """
         try:
             u2 = self._dm.get_u2()
-            system_actions: dict[ActionType, callable] = {
+            adb = self._dm.get_adb()
+            system_actions: dict[ActionType, Callable] = {
                 ActionType.BACK: u2.press_back,
                 ActionType.HOME: u2.press_home,
                 ActionType.RECENT_APPS: u2.press_recent,
                 ActionType.OPEN_APP: lambda: u2.app_start(action.params.package_name or ""),
                 ActionType.CLOSE_APP: lambda: u2.app_stop(action.params.package_name or ""),
                 ActionType.SCREENSHOT: lambda: self._capture_screenshot(),
+                ActionType.LOCK_SCREEN: adb.lock_screen,
+                ActionType.OPEN_NOTIFICATIONS: adb.open_notifications,
+                ActionType.ROTATE_SCREEN: lambda: adb.set_rotation(self._parse_rotation(action.params.direction)),
+                ActionType.VOLUME_UP: adb.volume_up,
+                ActionType.VOLUME_DOWN: adb.volume_down,
                 ActionType.TERMINATE: lambda: None,
                 ActionType.VERIFY: lambda: None,
             }
@@ -159,24 +169,57 @@ class ActionExecutor:
             return False
 
     @staticmethod
-    def _apply_tuning(params: ActionParams) -> None:
+    def _parse_rotation(direction: str | None) -> int:
+        """
+        将方向字符串解析为旋转值。
+
+        参数
+        ----------
+        direction : str | None
+            方向描述，可选 "portrait" / "landscape" / "reverse_portrait" / "reverse_landscape"。
+
+        返回
+        -------
+        int
+            旋转值（0-3）。
+
+        异常
+        ------
+        ValueError
+            direction 为非空但不在已知映射中时抛出。
+        """
+        mapping: dict[str, int] = {
+            "portrait": 0,
+            "landscape": 1,
+            "reverse_portrait": 2,
+            "reverse_landscape": 3,
+        }
+        if not direction:
+            return 0
+        if direction not in mapping:
+            raise ValueError(f"无效的旋转方向: {direction}，有效值: {list(mapping.keys())}")
+        return mapping[direction]
+
+    def _apply_tuning(self, params: ActionParams) -> None:
         """
         对坐标参数应用微调偏移。
 
-        当 enable_tuning 启用时，对 (x, y) 坐标分别加上配置的偏移量。
+        当 enable_tuning 启用时，对 (x, y) 坐标分别加上配置的偏移量，
+        并将结果裁剪到屏幕有效范围内（防止负坐标或超出屏幕）。
 
         参数
         ----------
         params : ActionParams
             待微调的操作参数，会直接修改其中的 x, y 值。
         """
+        screen_w, screen_h = self._dm.get_screen_size()
         if params.x is not None:
             old_x: int = params.x
-            params.x += settings.coordinate_tuning.offset_x
+            params.x = max(0, min(screen_w - 1, params.x + settings.coordinate_tuning.offset_x))
             logger.debug("坐标微调 X: %d -> %d (offset=%d)", old_x, params.x, settings.coordinate_tuning.offset_x)
         if params.y is not None:
             old_y: int = params.y
-            params.y += settings.coordinate_tuning.offset_y
+            params.y = max(0, min(screen_h - 1, params.y + settings.coordinate_tuning.offset_y))
             logger.debug("坐标微调 Y: %d -> %d (offset=%d)", old_y, params.y, settings.coordinate_tuning.offset_y)
 
     def _capture_screenshot(self) -> None:

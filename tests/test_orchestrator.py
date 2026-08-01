@@ -190,6 +190,37 @@ class TestTaskOrchestrator:
         assert context.status == TaskStatus.COMPLETED
         assert context.current_step == 1
 
+    def test_execute_task_max_steps_zero_unlimited(self, mocker):
+        """验证 max_steps=0 表示不限制步数（保留显式 0 语义）。"""
+        mock_step_runner = mocker.MagicMock()
+        # 第一次执行返回 WAIT 成功，第二次返回 TERMINATE 终止循环
+        mock_step_runner.run_step.side_effect = [
+            StepRecord(
+                step_index=1,
+                action=Action(ActionType.WAIT, ActionParams()),
+                status=StepStatus.SUCCESS,
+                page_summary="某页面",
+            ),
+            StepRecord(
+                step_index=2,
+                action=Action(ActionType.TERMINATE, ActionParams()),
+                status=StepStatus.SUCCESS,
+                page_summary="目标已达成",
+            ),
+        ]
+        mock_token_budget = mocker.MagicMock()
+
+        orchestrator = TaskOrchestrator(
+            step_runner=mock_step_runner,
+            token_budget=mock_token_budget,
+        )
+
+        context = orchestrator.execute_task(user_goal="测试", max_steps=0)
+        # max_steps=0 不被替换为默认值，任务按终止信号正常结束
+        assert context.max_steps == 0
+        assert context.current_step == 2
+        assert context.status == TaskStatus.COMPLETED
+
     def test_task_id_is_generated(self, mocker):
         """验证每次执行生成不同的 task_id。"""
         mock_step_runner = mocker.MagicMock()

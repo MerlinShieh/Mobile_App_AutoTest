@@ -300,7 +300,7 @@ class UITreeExtractor:
         将单个节点格式化为单行摘要文本。
 
         格式示例：
-            #3 [clickable] 提交 id=com.example:id/btn_ok bounds=[100,200,300,400]
+            #3 [可点] 提交 id=com.example:id/btn_ok bounds=[100,200,300,400]
 
         参数
         ----------
@@ -323,6 +323,8 @@ class UITreeExtractor:
             attrs_list.append("可勾选")
         if node.scrollable:
             attrs_list.append("可滚动")
+        if node.password or "edittext" in node.class_name.lower():
+            attrs_list.append("输入框")
         attrs = f"[{' '.join(attrs_list)}]" if attrs_list else ""
 
         text = node.text or node.content_desc or ""

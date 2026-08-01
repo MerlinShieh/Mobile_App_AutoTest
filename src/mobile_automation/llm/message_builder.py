@@ -1,6 +1,12 @@
 """
 消息组装器 —— 按多模态格式构建 LLM 请求消息。
 
+⚠️ DEPRECATED（已弃用）：
+本模块与 DecisionPromptBuilder 功能完全重叠，且未被核心流程引用。
+保留仅为向后兼容（以及对应的单元测试），新代码请使用
+`mobile_automation.prompts.decision_prompt.DecisionPromptBuilder`。
+后续可评估删除本模块及其测试。
+
 负责将系统 prompt、当前截图、结构化摘要和历史步骤摘要组装为
 LLM 所需的多模态消息格式。支持分层上下文管理：
 历史步骤仅保留文本摘要，当前步骤使用截图 + 结构化摘要。

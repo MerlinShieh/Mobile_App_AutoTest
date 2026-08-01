@@ -1,0 +1,10 @@
+# 统一行尾符为 LF（Windows 下检出时由 git 自动处理）
+* text=auto eol=lf
+
+# 二进制文件不进行行尾转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pyc binary
