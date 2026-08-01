@@ -7,6 +7,7 @@ import pytest
 
 from mobile_automation.llm.base import LLMAdapter, LLMMessage
 from mobile_automation.llm.llm_service import LLMService, LLMServiceFactory
+from mobile_automation.llm.openai_adapter import OpenAIAdapter
 
 
 class TestLLMServiceFactory:
@@ -39,6 +40,22 @@ class TestLLMServiceFactory:
         mocker.patch.object(LLMServiceFactory, "_adapters", {"mimo": lambda provider=None: mock_adapter})
         adapter = LLMServiceFactory.create("mimo")
         assert adapter == mock_adapter
+
+    def test_create_deepseek_adapter(self):
+        """验证 deepseek 挂载为 OpenAI 兼容适配器，并从配置读取模型/端点。"""
+        adapter = LLMServiceFactory.create("deepseek")
+        assert isinstance(adapter, OpenAIAdapter)
+        assert getattr(adapter, "_model") == "deepseek-v4-flash"
+        assert getattr(adapter, "_base_url") == "https://api.deepseek.com/v1"
+        assert adapter.context_window == 128000
+
+    def test_create_longcat_adapter(self):
+        """验证 longcat 挂载为 OpenAI 兼容适配器，并从配置读取模型/端点。"""
+        adapter = LLMServiceFactory.create("longcat")
+        assert isinstance(adapter, OpenAIAdapter)
+        assert getattr(adapter, "_model") == "LongCat-2.0"
+        assert getattr(adapter, "_base_url") == "https://api.longcat.chat/v1"
+        assert adapter.context_window == 128000
 
     def test_create_invalid_provider_raises(self):
         """验证不支持的提供商抛出异常。"""

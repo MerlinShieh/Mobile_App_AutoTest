@@ -39,6 +39,10 @@ class LLMServiceFactory:
         "anthropic": ClaudeAdapter,
         "zhipu": ZhipuAdapter,
         "mimo": MiMoAdapter,
+        # DeepSeek / LongCat 均为 OpenAI 兼容协议，复用 OpenAIAdapter
+        # （provider 参数驱动从 settings.models.providers 读取各自配置）
+        "deepseek": OpenAIAdapter,
+        "longcat": OpenAIAdapter,
         "local": OpenAIAdapter,
     }
     """提供商名称到 Adapter 类的映射字典。"""

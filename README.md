@@ -196,7 +196,7 @@ Mobile_App_AutoTest/
 │       │   ├── qwen_adapter.py    #   Qwen（文本 + 视觉）
 │       │   ├── zhipu_adapter.py   #   智谱 GLM（文本 + 视觉）
 │       │   ├── mimo_adapter.py    #   小米 MiMo（文本 + 视觉 + 思维链）
-│       │   ├── openai_adapter.py  #   OpenAI 兼容（含本地 llama）
+│       │   ├── openai_adapter.py  #   OpenAI 兼容（DeepSeek/LongCat/本地 llama 共用）
 │       │   └── claude_adapter.py  #   Anthropic Claude
 │       │
 │       ├── models/                # ═══ 共享数据结构 ═══
@@ -349,10 +349,10 @@ LLMService                            ← 统一调用入口（chat / count_toke
 | **Zhipu** | `zhipu-flash` / `zhipu-flashx` | 多模态 | 128K | ✅ |
 | **OpenAI 兼容** | `openai` / `local` | 多模态 / 纯文本 | 依模型 | ✅ |
 | **Claude** | `anthropic` | 多模态 | 依模型 | ✅ |
-| **DeepSeek**（默认纯文本 key） | `deepseek-flash` | 纯文本 | 128K | ⚠️ 已配置未挂载 |
-| **LongCat** | `longcat-flash` | 纯文本 | 128K | ⚠️ 已配置未挂载 |
+| **DeepSeek**（默认纯文本 key） | `deepseek-flash` | 纯文本 | 128K | ✅ |
+| **LongCat** | `longcat-flash` | 纯文本 | 128K | ✅ |
 
-> ⚠️ DeepSeek / LongCat 的 Provider 与模型已在 `config.py` 注册，但 `LLMServiceFactory._adapters` 尚未挂载对应适配器；如需使用，按 OpenAI 兼容协议调用或在工厂中注册 `OpenAIAdapter(provider="deepseek")`。
+> DeepSeek / LongCat 复用 OpenAI 兼容适配器（`OpenAIAdapter`），由工厂按 provider 名从 `settings.models.providers` 读取各自配置。
 
 ### 环境变量配置
 
