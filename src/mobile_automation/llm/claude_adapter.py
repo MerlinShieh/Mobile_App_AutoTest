@@ -159,3 +159,16 @@ class ClaudeAdapter(LLMAdapter):
         result: str = response.content[0].text if response.content else ""
         logger.debug("ClaudeAdapter.chat 收到回复: %d 字符", len(result))
         return result
+
+    def close(self) -> None:
+        """
+        释放 Anthropic SDK client 的底层连接池资源。
+
+        返回
+        ------
+        None
+        """
+        try:
+            self._client.close()
+        except Exception as exc:
+            logger.debug("ClaudeAdapter.close 异常（忽略）: %s", exc)

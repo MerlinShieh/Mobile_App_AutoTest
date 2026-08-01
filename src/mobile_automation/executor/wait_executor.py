@@ -56,6 +56,10 @@ class WaitExecutor:
         bool
             等待是否完成。页面稳定或指定时长耗尽时返回 True，超时返回 False。
         """
+        if action is None or action.params is None:
+            logger.warning("WAIT 操作缺少参数（action 或 params 为 None），按默认 1500ms 等待")
+            return self._wait_duration(1500)
+
         duration_ms: int = action.params.duration_ms
 
         if duration_ms > 0:

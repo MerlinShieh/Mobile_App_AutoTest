@@ -5,6 +5,7 @@ ADB 控制器封装模块。
 不可用时的 fallback 方案。支持截图、shell 命令、重连等基础操作。
 """
 
+import re
 import subprocess
 import time
 from typing import Optional
@@ -30,6 +31,13 @@ class ADBController:
         ADB 命令执行失败时的最大重试次数，默认 3。
     """
 
+    # shell 注入防御：合法 ADB 命令（input/settings/wm/statusbar/keyevent 等）
+    # 不应包含这些 shell 元字符。检测到即拒绝执行。
+    _SHELL_INJECTION_PATTERN = re.compile(
+        r"[\n;&|><$`]|\b(?:rm|mv|dd|reboot|su|sh)\b",
+        re.IGNORECASE,
+    )
+
     def __init__(self, serial: str, max_retries: int = 3) -> None:
         self.serial: str = serial
         self.max_retries: int = max_retries
@@ -51,9 +59,37 @@ class ADBController:
         """
         return [settings.device.adb_path, "-s", self.serial] + args
 
+    @classmethod
+    def _validate_shell_command(cls, command: str) -> None:
+        """
+        校验 shell 命令合法性，拒绝注入风险命令。
+
+        拒绝规则：
+        - 空命令或纯空白命令
+        - 包含 shell 元字符（; & | > < $ ` 换行）的命令
+        - 包含危险系统命令关键字（rm/mv/dd/reboot/su/sh）的命令
+
+        参数
+        ----------
+        command : str
+            待校验的 shell 命令字符串。
+
+        异常
+        ------
+        ValueError
+            命令为空或疑似注入时抛出。
+        """
+        if not command or not command.strip():
+            raise ValueError("ADB shell 命令不能为空")
+
+        if cls._SHELL_INJECTION_PATTERN.search(command):
+            raise ValueError(f"ADB shell 命令含可疑字符，已拒绝执行: {command!r}")
+
     def shell(self, command: str, timeout: int = 30) -> tuple[str, str]:
         """
         在设备上执行 ADB shell 命令。
+
+        执行前会校验命令合法性，拒绝空命令与疑似注入的命令。
 
         参数
         ----------
@@ -66,7 +102,13 @@ class ADBController:
         -------
         tuple[str, str]
             (标准输出, 标准错误) 的文本内容。
+
+        异常
+        ------
+        ValueError
+            命令为空或含注入风险字符时抛出。
         """
+        self._validate_shell_command(command)
         cmd = self._adb_cmd(["shell", command])
         logger.debug("执行 ADB shell: %s", " ".join(cmd))
         try:

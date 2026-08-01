@@ -157,3 +157,16 @@ class LLMAdapter(ABC):
         int
             模型支持的上下文窗口 Token 数上限。
         """
+
+    def close(self) -> None:
+        """
+        释放底层 HTTP client 资源（连接池等）。
+
+        基类默认实现为空操作（幂等）。持有网络连接的具体适配器
+        （OpenAI/Anthropic SDK client）应覆盖此方法调用 ``client.close()``。
+        多次调用是安全的。
+
+        返回
+        ------
+        None
+        """
