@@ -3,11 +3,37 @@
 > 本文件记录 Mobile_App_AutoTest 的版本迭代历史。
 > 版本规则：**大版本（major）= 里程碑级更新**（架构/稳定性/能力体系），**小版本（minor）= 功能迭代批次**，patch = 单点修复。
 
-当前建议版本：**v1.4.0**
+当前建议版本：**v1.4.1**
 
 ---
 
 # 最近更新
+
+## v1.4.1 — 环境修复与已知问题改进（2026-08-02）
+
+### 环境
+- **重建 .venv**：旧 venv 为 WSL 创建（损坏），用 uv + Python 3.13.1 重建 Windows 原生 venv，50 个依赖一次性安装成功
+- **AGENTS.md 新增规则**：运行/调试项目时优先使用 `.venv\Scripts\python.exe`，禁止直接使用全局 Python
+
+### 修复
+- **TypeExecutor 预填清空**：`_execute_type` 点击聚焦后先 `clear_text()` 清空预填内容（异常吞掉），再 `send_text`，防止新旧文本拼接（如「原神王者荣耀」）。Prompt 指引层 + 执行器层双重保障
+- **pytest 收集警告消除**：`testing/__init__.py` 中 `TestCase`/`TestResult`/`TestSummary` 三个 dataclass 加 `__test__ = False`，结束 3 个 `PytestCollectionWarning`
+
+### 测试
+- 单元测试：**398 → 410 passed**（新增 9 个 TypeExecutor 直测 + 4 个弹窗碰撞案例，0 回归）
+- 弹窗检测碰撞案例：单特征词不触发 / 大面积不可点击背景不触发 / 低于 85% 阈值不触发 / Dialog 关键词独立于屏幕尺寸
+
+### 待办
+- ⏳ 端到端真机验证：需连接设备后跑 3 次端到端冒烟回归，通过后才合并 main
+
+### 真机验证（2026-08-02）
+- ✅ **3/3 通过**（Xiaomi 23127PN0CC @ 127.0.0.1:5555，1440×2560）：
+  1. `打开设置应用` → completed（3 步，14.9s，LLM 识别桌面图标并点击）
+  2. `设置搜索"电池"` → completed（3 步，31.3s，clear_text → send_text 日志确认）
+  3. `预填"电池"后输入"王者荣耀"` → completed（3 步，19.7s，LLM 主动清除预填 + 执行器 clear_text 兜底，UI dump 确认无拼接）
+- ✅ 屏幕截图确认：搜索框最终显示「王者荣耀」，无文本拼接
+
+---
 
 ## v1.4.0 — StepRunner 上帝类拆分（2026-08-01）
 
