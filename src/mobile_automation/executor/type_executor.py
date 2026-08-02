@@ -108,6 +108,14 @@ class TypeExecutor:
                 logger.error("聚焦点击失败: (%d, %d), error=%s，中止文本输入", x, y, exc)
                 return False
 
+        # 清空输入框预填内容，防止新旧文本拼接
+        # （如已存在的"原神" + 新输入的"王者荣耀" → "原神王者荣耀"）
+        try:
+            u2.clear_text()
+            logger.debug("已清空输入框预填内容")
+        except Exception:
+            pass  # 非编辑框控件 clear_text 会失败，不影响后续输入
+
         try:
             u2.send_text(text)
             logger.info("文本输入成功: text=%s", text[:50] + ("..." if len(text) > 50 else ""))

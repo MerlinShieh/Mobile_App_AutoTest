@@ -299,13 +299,59 @@ class TestPopupHandlerExitMechanism:
         assert handler.handle(result) is True
         assert handler._can_auto_handle(nodes) is True
 
-    def test_report_to_llm_not_recorded_as_failure(self, mocker):
-        """验证 REPORT_TO_LLM 策略不记录失败（本应交由 LLM 决策）。"""
-        mock_dm = mocker.MagicMock()
-        handler = PopupHandler(mock_dm)
-        nodes = [UINode(element_id="#1", bounds=(10, 10, 100, 100))]
-
         result = PopupDetectResult(detected=True, popup_type=PopupType.UNKNOWN,
-                                   dialog_nodes=nodes)
+                                    dialog_nodes=nodes)
         assert handler.handle(result) is False
         assert handler._can_auto_handle(nodes) is True
+
+
+class TestPopupHandlerEdgeCases:
+    """弹窗检测碰撞案例：锁定现有防御行为，防止回归。"""
+
+    def test_feature_text_single_word_no_popup(self, mocker):
+        """单个特征文本（如只有"确定"）不触发弹窗检测。"""
+        mock_dm = mocker.MagicMock()
+        mock_dm.get_screen_size.return_value = (1080, 2400)
+        root = UINode()
+        node = UINode(element_id="#1", text="确定", bounds=(10, 10, 100, 50))
+        tree = UITree(root=root, local_index={"#1": node})
+        handler = PopupHandler(mock_dm)
+        result = handler.detect(tree)
+        assert result is None
+
+    def test_overlay_non_clickable_no_text_no_popup(self, mocker):
+        """大面积但不可点击且无文本的节点不触发覆盖层检测。"""
+        mock_dm = mocker.MagicMock()
+        mock_dm.get_screen_size.return_value = (1080, 2400)
+        root = UINode()
+        node = UINode(element_id="#1", bounds=(0, 0, 1080, 2400),
+                      clickable=False, text="")
+        tree = UITree(root=root, local_index={"#1": node})
+        handler = PopupHandler(mock_dm)
+        result = handler.detect(tree)
+        assert result is None
+
+    def test_overlay_ratio_below_threshold_no_popup(self, mocker):
+        """面积未达 85% 阈值时不触发覆盖层检测。"""
+        mock_dm = mocker.MagicMock()
+        mock_dm.get_screen_size.return_value = (1080, 2400)
+        root = UINode()
+        node = UINode(element_id="#1", bounds=(0, 0, 800, 2400),
+                      clickable=True, text="")
+        tree = UITree(root=root, local_index={"#1": node})
+        handler = PopupHandler(mock_dm)
+        result = handler.detect(tree)
+        assert result is None
+
+    def test_dialog_keyword_detected_even_with_invalid_screen(self, mocker):
+        """Dialog 关键词检测不依赖屏幕尺寸，尺寸无效时仍检测弹窗。"""
+        mock_dm = mocker.MagicMock()
+        mock_dm.get_screen_size.return_value = (0, 0)
+        root = UINode()
+        node = UINode(element_id="#1", resource_id="com.example:id/dialog",
+                      class_name="android.widget.LinearLayout")
+        tree = UITree(root=root, local_index={"#1": node})
+        handler = PopupHandler(mock_dm)
+        result = handler.detect(tree)
+        assert result is not None
+        assert result.detected is True

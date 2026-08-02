@@ -55,6 +55,7 @@ class TestCase:
     description: str = ""
     tags: list[str] = field(default_factory=list)
     timeout_seconds: int = 0
+    __test__ = False  # 数据类，非 pytest 测试类
 
 
 @dataclass
@@ -93,6 +94,7 @@ class TestResult:
     tokens_used: int = 0
     passed: bool = False
     task_id: str = ""
+    __test__ = False  # 数据类，非 pytest 测试类
 
 
 @dataclass
@@ -122,6 +124,7 @@ class TestSummary:
     total_duration: float = 0.0
     results: list[TestResult] = field(default_factory=list)
     started_at: str = ""
+    __test__ = False  # 数据类，非 pytest 测试类
 
 
 class BatchTestRunner:
