@@ -60,7 +60,7 @@ def _setup_stdout() -> None:
             sys.stdout.buffer,
             encoding="utf-8",
             errors="replace",
-            line_buffering=sys.stdout.line_buffering,
+            line_buffering=bool(sys.stdout.line_buffering),
         )
 
 
