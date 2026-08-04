@@ -1,0 +1,42 @@
+[
+    {
+        "goal": "打开设置",
+        "max_steps": 15,
+        "expected_status": "completed",
+        "description": "基础冒烟：从桌面打开系统设置应用",
+        "tags": ["smoke", "settings"],
+        "timeout_seconds": 120
+    },
+    {
+        "goal": "打开设置，找到 Wi-Fi 选项",
+        "max_steps": 20,
+        "expected_status": "completed",
+        "description": "进入设置后定位 Wi-Fi 入口",
+        "tags": ["smoke", "settings", "wifi"],
+        "timeout_seconds": 150
+    },
+    {
+        "goal": "打开设置，搜索「电池」并进入电池设置页",
+        "max_steps": 25,
+        "expected_status": "completed",
+        "description": "验证设置内搜索功能（真机已验证 3/3 通过）",
+        "tags": ["settings", "search", "battery"],
+        "timeout_seconds": 180
+    },
+    {
+        "goal": "打开相机应用",
+        "max_steps": 12,
+        "expected_status": "completed",
+        "description": "基础冒烟：启动系统相机应用",
+        "tags": ["smoke", "camera"],
+        "timeout_seconds": 90
+    },
+    {
+        "goal": "打开系统相册应用",
+        "max_steps": 12,
+        "expected_status": "completed",
+        "description": "基础冒烟：启动系统相册应用",
+        "tags": ["smoke", "gallery"],
+        "timeout_seconds": 90
+    }
+]

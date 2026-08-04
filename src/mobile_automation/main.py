@@ -4,21 +4,32 @@ CLI 入口 —— 移动端 AI 自动化操作框架的命令行启动点。
 提供命令行参数解析，支持指定任务描述、设备序列号、LLM 提供商和
 最大步数等参数。启动时自动初始化日志系统、设备连接和所有核心模块。
 
+支持两个子命令：
+- run：单任务执行（默认行为，参数与旧版一致）
+- test：批量测试（加载用例文件批量执行，支持标签筛选与报告生成）
+
 设计参考:
 - Open-AutoGLM: 交互模式（interactive mode）+ 简洁输出
 - mobile-mcp: 结构化进度反馈
 
 使用方式
 --------
-python -m src.mobile_automation.main --goal "打开设置，找到 Wi-Fi 选项"
-python -m src.mobile_automation.main --goal "打开淘宝搜索手机" --serial xxxxxx
-python -m src.mobile_automation.main --goal "..." --provider qwen --max-steps 50
+python -m src.mobile_automation.main -g "打开设置，找到 Wi-Fi 选项"
+python -m src.mobile_automation.main run -g "打开设置" --serial xxxxxx
+python -m src.mobile_automation.main run -g "..." --provider qwen --max-steps 50
+python -m src.mobile_automation.main test ./examples/test_cases.json
+python -m src.mobile_automation.main test ./examples/test_cases.json --filter smoke
+python -m src.mobile_automation.main test ./examples/test_cases.json --format-report html
 """
 
 import argparse
+import html as html_lib
 import io
+import json
 import sys
 import time
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
 from .config import settings
@@ -32,48 +43,46 @@ from .logger import get_logger, setup_logger, log_step_progress, log_task_start,
 from .models.task import TaskContext
 from .perception.screen_capture import ScreenCapture
 from .popup.popup_handler import PopupHandler
+from .testing import BatchTestRunner, TestCase, TestSummary
 
 logger = get_logger(__name__)
 
-# 跨平台终端输出兼容：将 stdout 包装为 UTF-8 编码，容忍无法编码的字符
-if hasattr(sys.stdout, "buffer"):
-    sys.stdout = io.TextIOWrapper(
-        sys.stdout.buffer,
-        encoding="utf-8",
-        errors="replace",
-        line_buffering=sys.stdout.line_buffering,
-    )
 
-
-def parse_args() -> argparse.Namespace:
+def _setup_stdout() -> None:
     """
-    解析命令行参数。
+    跨平台终端输出兼容：将 stdout 包装为 UTF-8 编码，容忍无法编码的字符。
 
-    支持以下参数：
-    - goal / -g：任务描述（必需）
-    - serial / -s：设备序列号（可选，默认自动选择）
-    - provider / -p：LLM 提供商（可选，默认 qwen）
-    - max-steps / -m：最大步数（可选，默认 30）
-
-    返回
-    -------
-    argparse.Namespace
-        解析后的命令行参数对象。
+    仅在命令行入口（__main__）调用，避免在模块导入时包装 stdout，
+    从而不影响 pytest 等框架对标准输出的捕获。
     """
-    parser = argparse.ArgumentParser(
-        description="移动端 AI 自动化操作框架 —— 基于多模态 LLM 的自动化测试工具",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-使用示例:
-  python -m mobile_automation.main -g "打开设置"
-  python -m mobile_automation.main -g "打开淘宝搜索手机" -s 123456
-  python -m mobile_automation.main -g "..." -p openai -m 50
-        """,
-    )
+    if hasattr(sys.stdout, "buffer"):
+        sys.stdout = io.TextIOWrapper(
+            sys.stdout.buffer,
+            encoding="utf-8",
+            errors="replace",
+            line_buffering=sys.stdout.line_buffering,
+        )
+
+
+# 支持的批量测试报告格式
+REPORT_FORMATS: tuple[str, ...] = ("json", "md", "html")
+# 批量测试报告默认输出根目录
+BATCH_REPORT_DIR: str = "reports/batch"
+
+
+def _add_run_args(parser: argparse.ArgumentParser) -> None:
+    """
+    向 parser 添加单任务/批量测试共用的执行参数。
+
+    - goal / -g：任务描述（可选，运行时校验，便于向后兼容无子命令用法）
+    - serial / -s：设备序列号
+    - provider / -p：LLM 提供商
+    - max-steps / -m：最大步数
+    """
     parser.add_argument(
         "-g", "--goal",
         type=str,
-        required=True,
+        default="",
         help="用户任务目标描述，如「打开设置找到 Wi-Fi 开关」",
     )
     parser.add_argument(
@@ -95,7 +104,98 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="任务最大执行步数（默认从配置文件读取）",
     )
-    return parser.parse_args()
+
+
+def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+    """
+    解析命令行参数。
+
+    支持两个子命令：
+    - run：单任务执行（参数与旧版一致：-g/-s/-p/-m）
+    - test：批量测试（用例文件路径 + --filter + --format-report 等）
+
+    向后兼容：不带子命令直接使用 -g/--goal 时按单任务执行。
+
+    参数
+    ----------
+    argv : Optional[list[str]]
+        命令行参数列表，为 None 时使用 sys.argv[1:]。
+
+    返回
+    -------
+    argparse.Namespace
+        解析后的命令行参数对象。
+    """
+    parser = argparse.ArgumentParser(
+        description="移动端 AI 自动化操作框架 —— 基于多模态 LLM 的自动化测试工具",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+使用示例:
+  python -m mobile_automation.main -g "打开设置"
+  python -m mobile_automation.main run -g "打开设置" -s 123456
+  python -m mobile_automation.main run -g "..." -p openai -m 50
+  python -m mobile_automation.main test ./examples/test_cases.json
+  python -m mobile_automation.main test ./examples/test_cases.json --filter smoke
+  python -m mobile_automation.main test ./examples/test_cases.json --format-report html
+        """,
+    )
+    subparsers = parser.add_subparsers(
+        dest="command",
+        metavar="COMMAND",
+        help="子命令: run（单任务执行）或 test（批量测试）",
+    )
+
+    # ---- 单任务执行子命令 ----
+    run_parser = subparsers.add_parser(
+        "run",
+        help="单任务执行：执行一个用户目标（默认行为）",
+        description="单任务执行：执行一个用户目标（默认行为）",
+    )
+    _add_run_args(run_parser)
+
+    # ---- 批量测试子命令 ----
+    test_parser = subparsers.add_parser(
+        "test",
+        help="批量测试：按用例文件批量执行自动化测试",
+        description="批量测试：按用例文件批量执行自动化测试",
+    )
+    test_parser.add_argument(
+        "cases",
+        type=str,
+        nargs="?",
+        default="",
+        help="测试用例 JSON 文件路径，例如 ./examples/test_cases.json",
+    )
+    test_parser.add_argument(
+        "--filter",
+        type=str,
+        default="",
+        help="按标签筛选用例，例如 --filter smoke 只执行带 smoke 标签的用例",
+    )
+    test_parser.add_argument(
+        "--format-report",
+        type=str,
+        default="json",
+        choices=list(REPORT_FORMATS),
+        help="批量测试报告格式（默认 json，可选 md/html）",
+    )
+    test_parser.add_argument(
+        "--report-dir",
+        type=str,
+        default="",
+        help="批量测试报告输出根目录（默认 reports/batch）",
+    )
+    test_parser.add_argument(
+        "--stop-on-failure",
+        action="store_true",
+        help="遇到失败用例时立即停止后续用例执行",
+    )
+    _add_run_args(test_parser)
+
+    # ---- 顶层参数：向后兼容不带子命令的用法 ----
+    _add_run_args(parser)
+
+    return parser.parse_args(argv)
 
 
 def build_app(args: argparse.Namespace) -> tuple[TaskOrchestrator, DeviceManager]:
@@ -248,39 +348,358 @@ def run_task(orchestrator: TaskOrchestrator, goal: str, max_steps: int) -> TaskC
     return task_context
 
 
-def main() -> int:
+def load_cases(json_path: str) -> list[TestCase]:
     """
-    主入口函数。
+    从 JSON 文件加载测试用例列表。
 
-    解析命令行参数 -> 初始化模块 -> 执行任务 -> 返回退出码。
+    JSON 文件格式（与 BatchTestRunner.TestCase 字段一致）：
+    ```json
+    [
+        {
+            "goal": "打开设置",
+            "max_steps": 10,
+            "expected_status": "completed",
+            "description": "基础设置打开测试",
+            "tags": ["smoke", "settings"],
+            "timeout_seconds": 120
+        }
+    ]
+    ```
+
+    参数
+    ----------
+    json_path : str
+        JSON 用例文件路径。
+
+    返回
+    -------
+    list[TestCase]
+        解析出的测试用例列表。
+
+    异常
+    ------
+    FileNotFoundError
+        JSON 文件不存在时抛出。
+    """
+    path = Path(json_path)
+    if not path.exists():
+        raise FileNotFoundError(f"测试用例文件不存在: {json_path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        data: list[dict] = json.load(f)
+
+    return [
+        TestCase(
+            goal=item["goal"],
+            max_steps=item.get("max_steps", 0),
+            expected_status=item.get("expected_status", "completed"),
+            description=item.get("description", ""),
+            tags=item.get("tags", []),
+            timeout_seconds=item.get("timeout_seconds", 0),
+        )
+        for item in data
+    ]
+
+
+def _summary_to_json(summary: TestSummary) -> dict[str, Any]:
+    """将批量测试汇总结果转换为 JSON 报告字典。"""
+    return {
+        "started_at": summary.started_at,
+        "total": summary.total,
+        "passed": summary.passed,
+        "failed": summary.failed,
+        "total_duration_seconds": round(summary.total_duration, 2),
+        "pass_rate": round(summary.passed / max(summary.total, 1) * 100, 1),
+        "results": [
+            {
+                "goal": r.test_case.goal,
+                "description": r.test_case.description,
+                "tags": r.test_case.tags,
+                "expected_status": r.test_case.expected_status,
+                "status": r.status,
+                "steps": r.steps_executed,
+                "success_rate": round(r.success_rate, 2),
+                "duration_seconds": round(r.duration_seconds, 2),
+                "tokens_used": r.tokens_used,
+                "passed": r.passed,
+                "task_id": r.task_id,
+                "error": r.error_message,
+            }
+            for r in summary.results
+        ],
+    }
+
+
+def _summary_to_markdown(summary: TestSummary) -> str:
+    """
+    将批量测试汇总结果转换为 Markdown 报告文本。
+
+    包含汇总概览与逐用例详情表格，表格中的特殊字符（竖线/换行）会被
+    转义，防止用例可控内容破坏报告结构。
+    """
+    pass_rate: float = summary.passed / max(summary.total, 1) * 100
+    lines: list[str] = [
+        "# 批量测试报告",
+        "",
+        f"- **开始时间**: {summary.started_at}",
+        f"- **总用例**: {summary.total}",
+        f"- **通过**: {summary.passed} ✅",
+        f"- **失败**: {summary.failed} ❌",
+        f"- **通过率**: {pass_rate:.1f}%",
+        f"- **总耗时**: {summary.total_duration:.1f} 秒",
+        "",
+        "## 用例详情",
+        "",
+        "| # | 状态 | 目标 | 描述 | 标签 | 预期状态 | 实际状态 | 步数 | 成功率 | 耗时 | 错误 |",
+        "|---|------|------|------|------|----------|----------|------|--------|------|------|",
+    ]
+
+    for i, r in enumerate(summary.results, start=1):
+        icon: str = "✅" if r.passed else "❌"
+        goal: str = (r.test_case.goal or "").replace("|", "｜").replace("\r\n", "<br>").replace("\n", "<br>")
+        desc: str = (r.test_case.description or "").replace("|", "｜").replace("\r\n", "<br>").replace("\n", "<br>")
+        error: str = (r.error_message or "").replace("|", "｜").replace("\r\n", "<br>").replace("\n", "<br>")
+        if len(error) > 80:
+            error = error[:80] + "…"
+        lines.append(
+            f"| {i} | {icon} | {goal} | {desc} | {','.join(r.test_case.tags)} | "
+            f"{r.test_case.expected_status} | {r.status} | {r.steps_executed} | "
+            f"{r.success_rate:.0%} | {r.duration_seconds:.1f}s | {error} |"
+        )
+
+    return "\n".join(lines) + "\n"
+
+
+def _summary_to_html(summary: TestSummary) -> str:
+    """
+    将批量测试汇总结果转换为自包含的 HTML 报告文本。
+
+    所有用例可控内容均经过 HTML 转义，防止注入破坏页面结构。
+    """
+    pass_rate: float = summary.passed / max(summary.total, 1) * 100
+    rows: list[str] = []
+    for i, r in enumerate(summary.results, start=1):
+        status_badge: str = '<span class="pass">✅ 通过</span>' if r.passed else '<span class="fail">❌ 失败</span>'
+        rows.append(
+            "<tr>"
+            f"<td>{i}</td>"
+            f"<td>{status_badge}</td>"
+            f"<td>{html_lib.escape(r.test_case.goal)}</td>"
+            f"<td>{html_lib.escape(r.test_case.description)}</td>"
+            f"<td>{html_lib.escape(','.join(r.test_case.tags))}</td>"
+            f"<td>{html_lib.escape(r.test_case.expected_status)}</td>"
+            f"<td>{html_lib.escape(r.status)}</td>"
+            f"<td>{r.steps_executed}</td>"
+            f"<td>{r.success_rate:.0%}</td>"
+            f"<td>{r.duration_seconds:.1f}s</td>"
+            f"<td>{html_lib.escape(r.error_message)}</td>"
+            "</tr>"
+        )
+
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>批量测试报告</title>
+<style>
+  body {{ font-family: "Microsoft YaHei", sans-serif; margin: 24px; color: #333; }}
+  h1 {{ border-bottom: 2px solid #4a90d9; padding-bottom: 8px; }}
+  table {{ border-collapse: collapse; width: 100%; margin-top: 16px; }}
+  th, td {{ border: 1px solid #ddd; padding: 8px 12px; text-align: left; font-size: 14px; }}
+  th {{ background: #f2f7fc; }}
+  .pass {{ color: #1a7f37; font-weight: bold; }}
+  .fail {{ color: #cf222e; font-weight: bold; }}
+  .summary {{ display: flex; gap: 24px; margin: 16px 0; flex-wrap: wrap; }}
+  .card {{ background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 20px; }}
+</style>
+</head>
+<body>
+<h1>批量测试报告</h1>
+<div class="summary">
+  <div class="card"><strong>总用例</strong>: {summary.total}</div>
+  <div class="card"><strong>通过</strong>: {summary.passed}</div>
+  <div class="card"><strong>失败</strong>: {summary.failed}</div>
+  <div class="card"><strong>通过率</strong>: {pass_rate:.1f}%</div>
+  <div class="card"><strong>总耗时</strong>: {summary.total_duration:.1f} 秒</div>
+  <div class="card"><strong>开始时间</strong>: {html_lib.escape(summary.started_at)}</div>
+</div>
+<table>
+  <thead><tr><th>#</th><th>状态</th><th>目标</th><th>描述</th><th>标签</th><th>预期状态</th><th>实际状态</th><th>步数</th><th>成功率</th><th>耗时</th><th>错误</th></tr></thead>
+  <tbody>
+  {''.join(rows)}
+  </tbody>
+</table>
+</body>
+</html>
+"""
+
+
+def save_batch_report(summary: TestSummary, args: argparse.Namespace) -> str:
+    """
+    按指定格式保存批量测试报告。
+
+    报告输出到 <report-dir>/batch/<时间戳>/batch_test_report.<ext>，
+    默认 report-dir 为 reports。
+
+    参数
+    ----------
+    summary : TestSummary
+        批量测试汇总结果。
+    args : argparse.Namespace
+        命令行参数（format_report / report_dir）。
+
+    返回
+    -------
+    str
+        实际写入的报告文件路径。
+    """
+    fmt: str = (args.format_report or "json").lower()
+    base_dir: Path = Path(args.report_dir or "reports") / "batch"
+    ts: str = datetime.now().strftime("%y_%m_%d_%H_%M_%S")
+    out_dir: Path = base_dir / ts
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    ext: str = fmt if fmt in REPORT_FORMATS else "json"
+    output_path: Path = out_dir / f"batch_test_report.{ext}"
+
+    if fmt == "json":
+        output_path.write_text(
+            json.dumps(_summary_to_json(summary), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    elif fmt == "md":
+        output_path.write_text(_summary_to_markdown(summary), encoding="utf-8")
+    else:
+        output_path.write_text(_summary_to_html(summary), encoding="utf-8")
+
+    logger.info("批量测试报告已保存: %s", output_path)
+    return str(output_path)
+
+
+def run_single_task(args: argparse.Namespace) -> int:
+    """
+    单任务执行入口（run 子命令或向后兼容的默认行为）。
+
+    参数
+    ----------
+    args : argparse.Namespace
+        命令行参数。
 
     返回
     -------
     int
-        退出码：0 表示任务成功或部分成功，1 表示任务失败或出错。
+        退出码：0 表示任务成功或部分成功，1 表示任务失败或出错，2 表示参数缺失。
     """
+    if not args.goal:
+        print(
+            "[ERROR] 未指定任务目标，请使用 -g/--goal 参数，例如: "
+            'python -m mobile_automation.main -g "打开设置"',
+            file=sys.stderr,
+        )
+        return 2
+
     dm: Optional[DeviceManager] = None
     try:
-        args: argparse.Namespace = parse_args()
         orchestrator, dm = build_app(args)
         context: TaskContext = run_task(orchestrator, args.goal, args.max_steps)
-
-        if dm:
-            dm.disconnect()
-            logger.info("设备连接已断开")
 
         if context.status.value in ("completed", "partially_completed", "aborted"):
             logger.info("任务最终状态: %s，退出码 0", context.status.value)
             return 0
-        else:
-            logger.warning("任务最终状态: %s，退出码 1", context.status.value)
-            return 1
+        logger.warning("任务最终状态: %s，退出码 1", context.status.value)
+        return 1
 
     except Exception as exc:
         logger.critical("框架运行异常: %s", exc, exc_info=True)
         print(f"\n[ERROR] 框架运行异常: {exc}", file=sys.stderr)
         return 1
+    finally:
+        if dm:
+            dm.disconnect()
+            logger.info("设备连接已断开")
+
+
+def run_batch_tests(args: argparse.Namespace) -> int:
+    """
+    批量测试执行入口（test 子命令）。
+
+    流程：构建模块 -> 加载用例 -> 标签筛选 -> 批量执行 -> 保存报告。
+
+    参数
+    ----------
+    args : argparse.Namespace
+        命令行参数。
+
+    返回
+    -------
+    int
+        退出码：0 表示全部通过，1 表示存在失败用例或出错，2 表示参数缺失。
+    """
+    if not args.cases:
+        print(
+            "[ERROR] 未指定测试用例文件路径，用法示例: "
+            "python -m mobile_automation.main test ./examples/test_cases.json",
+            file=sys.stderr,
+        )
+        return 2
+
+    dm: Optional[DeviceManager] = None
+    try:
+        orchestrator, dm = build_app(args)
+        runner: BatchTestRunner = BatchTestRunner(orchestrator)
+        cases: list[TestCase] = load_cases(args.cases)
+
+        if args.filter:
+            cases = [c for c in cases if args.filter in c.tags]
+            logger.info("按标签筛选 '%s'，剩余 %d 个用例", args.filter, len(cases))
+            if not cases:
+                logger.warning("没有匹配标签 '%s' 的测试用例", args.filter)
+                print(f"[WARN] 没有匹配标签 '{args.filter}' 的测试用例", file=sys.stderr)
+                return 1
+
+        summary: TestSummary = runner.run_all(cases, stop_on_failure=args.stop_on_failure)
+
+        report_path: str = save_batch_report(summary, args)
+        if report_path:
+            print(f"批量测试报告已保存: {report_path}")
+
+        if summary.failed == 0:
+            logger.info("批量测试全部通过，退出码 0")
+            return 0
+        logger.warning("批量测试存在失败用例，退出码 1")
+        return 1
+
+    except Exception as exc:
+        logger.critical("批量测试运行异常: %s", exc, exc_info=True)
+        print(f"\n[ERROR] 批量测试运行异常: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        if dm:
+            dm.disconnect()
+            logger.info("设备连接已断开")
+
+
+def main() -> int:
+    """
+    主入口函数。
+
+    解析命令行参数并分发到对应执行入口：
+    - test 子命令 -> run_batch_tests（批量测试）
+    - run 子命令或无子命令 -> run_single_task（单任务执行）
+
+    返回
+    -------
+    int
+        退出码：0 表示成功，1 表示执行失败，2 表示参数缺失。
+    """
+    args: argparse.Namespace = parse_args()
+
+    command: str = args.command or "run"
+    if command == "test":
+        return run_batch_tests(args)
+    return run_single_task(args)
 
 
 if __name__ == "__main__":
+    _setup_stdout()
     sys.exit(main())
