@@ -39,8 +39,12 @@ class PopupHandler:
         设备管理器实例，用于执行弹窗关闭操作。
     """
 
-    DIALOG_KEYWORDS: set[str] = {"dialog", "alert", "popup", "dialogroot"}
-    """节点 resource-id 或 class-name 中包含这些关键词时视为弹窗关联节点。"""
+    DIALOG_KEYWORDS: set[str] = {"dialog", "alert", "dialogroot"}
+    """节点 resource-id 或 class-name 中包含这些关键词时视为弹窗关联节点。
+
+    注意：已移除 "popup"，因为 class_name 中的 PopupWindow / PopupMenu 等
+    非弹窗控件是最大误报源（此类控件在正常页面中大量存在）。
+    """
 
     FEATURE_TEXTS: set[str] = {
         "允许", "拒绝", "确定", "取消", "同意",
@@ -54,6 +58,13 @@ class PopupHandler:
     注意：桌面的 Launcher 工作区或 Widget 容器面积可能超过 60%，
     提高阈值至 85% 以减少误报。真实的系统级弹窗覆盖层通常覆盖
     90%~100% 的屏幕面积。
+    """
+
+    _NON_OVERLAY_CLASSES: set[str] = {"android.widget.frame", "android.view.viewgroup"}
+    """根容器 class_name 黑名单（小写前缀匹配）。
+
+    页面根布局（FrameLayout / ViewGroup 及其子类）即使面积接近全屏且可点击，
+    也属于正常页面结构而非弹窗覆盖层，检测时按前缀排除。
     """
 
     def __init__(self, device_manager: DeviceManager) -> None:
@@ -307,6 +318,7 @@ class PopupHandler:
             n for n in tree.local_index.values()
             if n.area() > screen_area * self.OVERLAY_AREA_RATIO
             and (n.clickable or n.text)
+            and not any(n.class_name.lower().startswith(p) for p in self._NON_OVERLAY_CLASSES)
         ]
 
     def _find_by_feature_text(self, tree: UITree) -> list[UINode]:
@@ -333,6 +345,21 @@ class PopupHandler:
         ]
         unique_texts = {n.text.strip().lower() for n in matched}
         if len(unique_texts) >= 2:
+            # 空间聚集度检查：真实弹窗的按钮通常聚集在同一区域；
+            # 若匹配节点在水平或垂直方向的跨度超过屏幕尺寸的 60%，
+            # 说明按钮分散在页面各处（更像正常表单页布局），判定非弹窗。
+            # 屏幕尺寸无效 (0,0) 时跳过该检查，保留原有行为。
+            screen_w, screen_h = self._dm.get_screen_size()
+            if screen_w > 0 and screen_h > 0:
+                centers = [n.center() for n in matched]
+                xs = [c[0] for c in centers]
+                ys = [c[1] for c in centers]
+                span_x: int = max(xs) - min(xs)
+                span_y: int = max(ys) - min(ys)
+                if span_x > screen_w * 0.6 or span_y > screen_h * 0.6:
+                    logger.debug("特征文本节点空间分散（span_x=%d, span_y=%d），判定非弹窗",
+                                 span_x, span_y)
+                    return []
             return matched
         return []
 

@@ -125,6 +125,45 @@ class TestPopupHandlerDetect:
         assert result is not None
         assert result.popup_type == PopupType.UPDATE_DIALOG
 
+    def test_popup_in_class_name_no_trigger(self, mocker):
+        """class_name 含 PopupWindow 等非弹窗控件不触发 Dialog 关键词检测。
+
+        "popup" 已从 DIALOG_KEYWORDS 移除，PopupWindow / PopupMenu 等
+        非弹窗控件（正常页面大量存在）不再被误判为弹窗。
+        """
+        mock_dm = mocker.MagicMock()
+        mock_dm.get_screen_size.return_value = (1080, 2400)
+        root = UINode()
+        node = UINode(
+            element_id="#1",
+            resource_id="com.example:id/popup_menu",
+            class_name="android.widget.PopupWindow",
+        )
+        tree = UITree(root=root, local_index={"#1": node})
+        handler = PopupHandler(mock_dm)
+        result = handler.detect(tree)
+        assert result is None
+
+    def test_root_container_no_overlay_trigger(self, mocker):
+        """全屏可点击的根容器 FrameLayout 不触发覆盖层检测。
+
+        页面根布局（FrameLayout / ViewGroup 等）即使面积接近全屏且可点击，
+        也属于正常页面结构而非弹窗覆盖层。
+        """
+        mock_dm = mocker.MagicMock()
+        mock_dm.get_screen_size.return_value = (1440, 2560)
+        root = UINode()
+        node = UINode(
+            element_id="#1",
+            bounds=(0, 0, 1440, 2560),
+            clickable=True,
+            class_name="android.widget.FrameLayout",
+        )
+        tree = UITree(root=root, local_index={"#1": node})
+        handler = PopupHandler(mock_dm)
+        result = handler.detect(tree)
+        assert result is None
+
 
 class TestPopupHandlerHandle:
     """测试 PopupHandler 的弹窗处理方法。"""
@@ -351,6 +390,34 @@ class TestPopupHandlerEdgeCases:
         node = UINode(element_id="#1", resource_id="com.example:id/dialog",
                       class_name="android.widget.LinearLayout")
         tree = UITree(root=root, local_index={"#1": node})
+        handler = PopupHandler(mock_dm)
+        result = handler.detect(tree)
+        assert result is not None
+        assert result.detected is True
+
+    def test_feature_text_spatially_dispersed_no_popup(self, mocker):
+        """特征文本节点分散在屏幕两端（如正常表单页布局）时不触发特征文本检测。
+
+        水平跨度超过屏幕宽 60% 时判定为页面按钮而非弹窗。
+        """
+        mock_dm = mocker.MagicMock()
+        mock_dm.get_screen_size.return_value = (1440, 2560)
+        root = UINode()
+        node1 = UINode(element_id="#1", text="确定", bounds=(100, 2000, 160, 2050))
+        node2 = UINode(element_id="#2", text="取消", bounds=(1300, 2000, 1360, 2050))
+        tree = UITree(root=root, local_index={"#1": node1, "#2": node2})
+        handler = PopupHandler(mock_dm)
+        result = handler.detect(tree)
+        assert result is None
+
+    def test_feature_text_spatially_clustered_detected(self, mocker):
+        """特征文本节点聚集在相邻区域（真实弹窗按钮布局）时触发特征文本检测。"""
+        mock_dm = mocker.MagicMock()
+        mock_dm.get_screen_size.return_value = (1440, 2560)
+        root = UINode()
+        node1 = UINode(element_id="#1", text="确定", bounds=(600, 2000, 700, 2050))
+        node2 = UINode(element_id="#2", text="取消", bounds=(700, 2000, 800, 2050))
+        tree = UITree(root=root, local_index={"#1": node1, "#2": node2})
         handler = PopupHandler(mock_dm)
         result = handler.detect(tree)
         assert result is not None
