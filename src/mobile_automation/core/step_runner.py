@@ -228,6 +228,18 @@ class StepRunner:
             record.error_message = "max_retries_per_step 配置为 0，步骤无法执行"
             logger.error("Step %d %s", step_index, record.error_message)
 
+        # 弹窗持续存在导致 attempt 耗尽（弹窗重试不计入 retry_count）时，
+        # 状态会停留在 RETRYING 非终态；此处补齐 FAILED 终态并写明错误，
+        # 避免编排层只记 warning、步骤以非终态返回并污染 success_rate 统计
+        if record.status == StepStatus.RETRYING:
+            record.status = StepStatus.FAILED
+            record.error_message = "弹窗处理失败：重试耗尽后弹窗仍存在"
+            logger.error("Step %d %s", step_index, record.error_message)
+            self._execution_pipeline._register_step_archive(
+                step_index, None, record.action, record.status.value,
+                error=record.error_message,
+            )
+
         return record
 
     @staticmethod

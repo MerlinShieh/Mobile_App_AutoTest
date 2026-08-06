@@ -236,6 +236,58 @@ class TestStepRunner:
         assert record.action.action_type == ActionType.BACK
         mock_llm_service.chat.assert_not_called()
 
+    def test_run_step_popup_persistent_exhausts_attempts_failed(
+        self, mocker, mock_device_manager, mock_perception, mock_llm_service
+    ):
+        """验证弹窗持续存在直至 attempt 耗尽时，步骤以 FAILED 终态返回（非 RETRYING）。
+
+        弹窗重试不计入 retry_count（保持既有设计），但 attempt 耗尽后必须补齐 FAILED
+        终态，避免步骤以 RETRYING 非终态泄漏到编排层。
+        """
+        mocker.patch("mobile_automation.core.step_runner.settings.execution.max_retries_per_step", 2)
+
+        popup_result = mocker.MagicMock()
+        popup_result.detected = True
+        popup_result.auto_handlable = True
+        popup_result.popup_type.value = "permission"
+        mock_popup = mocker.MagicMock()
+        mock_popup.detect.return_value = popup_result
+        mock_popup.handle.return_value = True
+
+        mock_executor = mocker.MagicMock()
+        mock_executor.execute.return_value = True
+
+        ui_tree = UITree(
+            root=UINode(),
+            local_index={"#1": UINode(element_id="#1", bounds=(0, 0, 50, 50))},
+            structured_summary="#1 clickable",
+        )
+        mock_perception.capture_with_ui_tree.return_value = mocker.MagicMock(
+            screenshot_base64="b64",
+            screenshot_format="jpeg",
+            ui_tree=ui_tree,
+            page_stable=True,
+            change_score=0.0,
+            timestamp_ms=1000,
+        )
+
+        runner = StepRunner(
+            device_manager=mock_device_manager,
+            perception=mock_perception,
+            popup_handler=mock_popup,
+            llm_service=mock_llm_service,
+            action_executor=mock_executor,
+        )
+
+        context = TaskContext(task_id="test-001", user_goal="测试")
+        record = runner.run_step(1, context)
+
+        assert record.status == StepStatus.FAILED
+        assert record.error_message
+        assert "弹窗" in record.error_message
+        # 弹窗重试不计入 retry_count（语义分离），耗尽后仅补齐终态
+        assert record.retry_count == 0
+
     def test_run_step_executor_failure(self, mocker, mock_device_manager, mock_perception, mock_llm_service):
         """验证执行器失败时记录错误并重试。"""
         mock_popup = mocker.MagicMock()

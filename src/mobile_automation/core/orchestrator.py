@@ -169,9 +169,15 @@ class TaskOrchestrator:
                 else:
                     logger.warning("任务 %s 步骤 %d 失败: %s",
                                    context.task_id, step_index, record.error_message)
-                    if record.retry_count >= settings.execution.max_retries_per_step:
+                    # 步骤为 FAILED 终态即终止任务：既覆盖"普通步骤重试耗尽"（retry_count
+                    # >= max_retries）的既有判定，也覆盖"弹窗重试耗尽"路径——该路径
+                    # retry_count 恒为 0 不满足下方计数判定，若仅记 warning 会让失败步骤
+                    # 继续以非终态语义执行并污染 success_rate 统计
+                    if record.status == StepStatus.FAILED or (
+                        record.retry_count >= settings.execution.max_retries_per_step
+                    ):
                         context.status = TaskStatus.FAILED
-                        logger.error("任务 %s 因步骤 %d 失败次数过多而终止", context.task_id, step_index)
+                        logger.error("任务 %s 因步骤 %d 失败而终止", context.task_id, step_index)
                         break
 
                 if self._detect_loop(record.action):

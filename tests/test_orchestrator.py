@@ -60,6 +60,32 @@ class TestTaskOrchestrator:
         context = orchestrator.execute_task(user_goal="测试", max_steps=5)
         assert context.status == TaskStatus.FAILED
 
+    def test_execute_task_popup_exhausted_failed_step(self, mocker):
+        """验证弹窗重试耗尽的 FAILED 步骤（retry_count=0）触发任务失败。
+
+        弹窗路径 retry_count 恒为 0，不满足旧的 retry_count >= max_retries 判定；
+        步骤以 FAILED 终态返回时必须走失败处理路径终止任务，而非仅记 warning。
+        """
+        mock_step_runner = mocker.MagicMock()
+        mock_token_budget = mocker.MagicMock()
+
+        mock_step_runner.run_step.return_value = StepRecord(
+            step_index=1,
+            action=Action(ActionType.CLICK, ActionParams(element_id="#1")),
+            status=StepStatus.FAILED,
+            error_message="弹窗处理失败：重试耗尽后弹窗仍存在",
+            retry_count=0,
+        )
+
+        orchestrator = TaskOrchestrator(
+            step_runner=mock_step_runner,
+            token_budget=mock_token_budget,
+        )
+
+        context = orchestrator.execute_task(user_goal="测试", max_steps=5)
+        assert context.status == TaskStatus.FAILED
+        assert context.current_step == 1
+
     def test_execute_task_loop_detection(self, mocker):
         """验证死循环检测后任务标记为 ABORTED。"""
         mock_step_runner = mocker.MagicMock()
