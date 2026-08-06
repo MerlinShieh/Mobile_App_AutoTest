@@ -6,6 +6,7 @@ ADB 控制器封装模块。
 """
 
 import re
+import shlex
 import subprocess
 import time
 from typing import Optional
@@ -316,6 +317,93 @@ class ADBController:
 
         logger.info("读取短信完成，类型: %s，条数: %d", sms_type, len(messages))
         return messages
+
+    def get_clipboard(self) -> str:
+        """
+        读取系统剪贴板文本（系统级能力，Android 10+）。
+
+        通过 `cmd clipboard get` 读取剪贴板内容。命令失败、无权限、
+        无内容或 shell 异常时返回空字符串（容错，不抛异常）。
+
+        返回
+        -------
+        str
+            剪贴板文本（已 trim）；失败或为空时返回 ""。
+
+        异常
+        ------
+        ValueError
+            serial 含注入字符时抛出。
+        """
+        # serial 虽作为独立参数传入 subprocess 不经 shell 解析，仍统一做注入防御
+        if self._SHELL_INJECTION_PATTERN.search(self.serial):
+            logger.warning("serial 含可疑字符，已拒绝读取剪贴板: %r", self.serial)
+            raise ValueError(f"serial 含可疑字符，已拒绝执行: {self.serial!r}")
+
+        try:
+            stdout, stderr = self.shell("cmd clipboard get")
+        except Exception as exc:
+            logger.error("读取剪贴板命令执行异常: %s", exc)
+            return ""
+
+        # 命令失败判定：输出无效或 stderr 非空均视为失败，容错返回空字符串
+        if not isinstance(stdout, str) or not stdout.strip():
+            logger.warning("读取剪贴板命令无有效输出，stderr: %s", stderr)
+            return ""
+        if stderr.strip():
+            logger.warning("读取剪贴板命令返回 stderr，视为失败: %s", stderr.strip())
+            return ""
+
+        text = stdout.strip()
+        logger.info("读取剪贴板完成，长度: %d", len(text))
+        return text
+
+    def set_clipboard(self, text: str) -> bool:
+        """
+        写入系统剪贴板文本（系统级能力，Android 10+）。
+
+        通过 `cmd clipboard set` 写入剪贴板。文本经 shlex.quote 转义，
+        保证含空格/引号等特殊字符时在设备 shell 中正确传参。
+
+        参数
+        ----------
+        text : str
+            要写入剪贴板的文本内容。
+
+        返回
+        -------
+        bool
+            True 表示写入成功（shell 执行成功且无 stderr）；
+            False 表示失败（text 为空/None、shell 失败或异常，容错不抛出）。
+
+        异常
+        ------
+        ValueError
+            serial 含注入字符时抛出。
+        """
+        # serial 虽作为独立参数传入 subprocess 不经 shell 解析，仍统一做注入防御
+        if self._SHELL_INJECTION_PATTERN.search(self.serial):
+            logger.warning("serial 含可疑字符，已拒绝写入剪贴板: %r", self.serial)
+            raise ValueError(f"serial 含可疑字符，已拒绝执行: {self.serial!r}")
+
+        if not text:
+            logger.warning("写入剪贴板失败: 文本为空或 None")
+            return False
+
+        command = f"cmd clipboard set {shlex.quote(text)}"
+        try:
+            _, stderr = self.shell(command)
+        except Exception as exc:
+            logger.error("写入剪贴板命令执行异常: %s", exc)
+            return False
+
+        if stderr.strip():
+            logger.warning("写入剪贴板命令返回 stderr，视为失败: %s", stderr.strip())
+            return False
+
+        logger.info("写入剪贴板完成，长度: %d", len(text))
+        return True
+
 
     def set_rotation(self, rotation: int = 0) -> None:
         """
