@@ -1,8 +1,9 @@
 """
 LLM 服务统一入口 —— LLMServiceFactory 工厂与 LLMService 服务类。
 
-通过工厂模式根据配置字符串（qwen / openai / anthropic）创建对应的
-Adapter 实例，LLMService 对外提供统一的 chat 和 count_tokens 接口。
+通过工厂模式根据配置字符串（qwen / openai / anthropic / zhipu /
+mimo / deepseek / longcat / local）创建对应的 Adapter 实例，
+LLMService 对外提供统一的 chat 和 count_tokens 接口。
 """
 
 from typing import Optional
@@ -55,7 +56,8 @@ class LLMServiceFactory:
         参数
         ----------
         provider : Optional[str]
-            提供商名称，支持 "qwen" / "openai" / "anthropic"。
+            提供商名称，支持 "qwen" / "openai" / "anthropic" /
+            "zhipu" / "mimo" / "deepseek" / "longcat" / "local"。
             为 None 时从 settings.llm.provider 读取。
 
         返回
@@ -142,7 +144,7 @@ class LLMService:
         返回
         -------
         str
-            提供商名称，如 "qwen" / "openai" / "anthropic"。
+            提供商名称，如 "qwen" / "openai" / "mimo" / "deepseek" 等。
         """
         return self._provider
 

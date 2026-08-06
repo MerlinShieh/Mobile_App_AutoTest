@@ -21,6 +21,7 @@ from .qwen_adapter import QwenAdapter
 from .openai_adapter import OpenAIAdapter
 from .claude_adapter import ClaudeAdapter
 from .zhipu_adapter import ZhipuAdapter
+from .mimo_adapter import MiMoAdapter
 from .llm_service import LLMServiceFactory, LLMService
 from .token_budget import TokenBudgetManager
 
@@ -31,6 +32,7 @@ __all__ = [
     "OpenAIAdapter",
     "ClaudeAdapter",
     "ZhipuAdapter",
+    "MiMoAdapter",
     "LLMServiceFactory",
     "LLMService",
     "TokenBudgetManager",

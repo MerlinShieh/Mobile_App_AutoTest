@@ -150,6 +150,32 @@ class ExecutionPipeline:
         except Exception as exc:
             logger.warning("截图归档失败: %s", exc)
 
+    def register_failed_step_archive(
+        self,
+        step_index: int,
+        action: Action,
+        status: str,
+        error: str = "",
+    ) -> None:
+        """
+        注册失败步骤的归档数据（公开接口，供编排层在异常/重试耗尽场景调用）。
+
+        内部委托给 _register_step_archive，其中 perceptual 固定为 None
+        （失败场景下无操作前感知结果）。
+
+        参数
+        ----------
+        step_index : int
+            步骤序号。
+        action : Action
+            执行的操作指令。
+        status : str
+            步骤状态。
+        error : str
+            错误信息。
+        """
+        self._register_step_archive(step_index, None, action, status, error=error)
+
     def _register_step_archive(
         self,
         step_index: int,

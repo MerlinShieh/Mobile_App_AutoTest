@@ -5,6 +5,7 @@
 
 import pytest
 
+from mobile_automation.llm import MiMoAdapter
 from mobile_automation.llm.base import LLMAdapter, LLMMessage
 from mobile_automation.llm.llm_service import LLMService, LLMServiceFactory
 from mobile_automation.llm.openai_adapter import OpenAIAdapter
@@ -40,6 +41,11 @@ class TestLLMServiceFactory:
         mocker.patch.object(LLMServiceFactory, "_adapters", {"mimo": lambda provider=None: mock_adapter})
         adapter = LLMServiceFactory.create("mimo")
         assert adapter == mock_adapter
+
+    def test_package_exports_mimo_adapter(self):
+        """验证 llm 包级 __init__ 导出 MiMoAdapter。"""
+        from mobile_automation.llm.mimo_adapter import MiMoAdapter as ModuleAdapter
+        assert MiMoAdapter is ModuleAdapter
 
     def test_create_deepseek_adapter(self):
         """验证 deepseek 挂载为 OpenAI 兼容适配器，并从配置读取模型/端点。"""

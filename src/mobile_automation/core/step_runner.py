@@ -212,8 +212,8 @@ class StepRunner:
                 if record.retry_count >= settings.execution.max_retries_per_step:
                     record.status = StepStatus.FAILED
                     logger.error("Step %d 已达最大重试次数，标记为失败", step_index)
-                    self._execution_pipeline._register_step_archive(
-                        step_index, None, record.action, record.status.value,
+                    self._execution_pipeline.register_failed_step_archive(
+                        step_index, record.action, record.status.value,
                         error=record.error_message,
                     )
                     # 标记失败后立即跳出循环，避免下一轮迭代将状态覆盖为 RUNNING
@@ -235,8 +235,8 @@ class StepRunner:
             record.status = StepStatus.FAILED
             record.error_message = "弹窗处理失败：重试耗尽后弹窗仍存在"
             logger.error("Step %d %s", step_index, record.error_message)
-            self._execution_pipeline._register_step_archive(
-                step_index, None, record.action, record.status.value,
+            self._execution_pipeline.register_failed_step_archive(
+                step_index, record.action, record.status.value,
                 error=record.error_message,
             )
 

@@ -16,25 +16,47 @@
 
 ```
 mobile_automation/
-├── framework/          ← 跨平台核心（orchestrator, step_runner, logger, hooks）
-├── mobile/             ← Android 专属适配层
-│   ├── device/         ← ADB / u2 设备控制
-│   ├── executor/       ← 动作执行器（click/swipe/type/wait/back）
-│   ├── perception/     ← 截图/UI树/页面差异
-│   └── popup/          ← 弹窗检测与处理
-├── llm/                ← 横切基础服务
-│   ├── adapters/       ← 统一适配器 + 能力注册表
-│   │   ├── unified_adapter.py  ← 统一 OpenAI 兼容适配器
-│   │   ├── qwen_adapter.py     ← Qwen 多模态
-│   │   ├── zhipu_adapter.py    ← 智谱 GLM 多模态
-│   │   ├── deepseek_adapter.py ← DeepSeek 纯文本
-│   │   └── longcat_adapter.py  ← LongCat 纯文本
-│   ├── llm_service.py  ← 工厂模式 + 能力选择
-│   └── token_budget.py ← 4级动态压缩策略
-├── models/             ← 共享数据结构
-├── prompts/            ← Prompt 模板（中英双语）
-├── reporting/          ← 归档与报告生成
-└── exception/          ← 异常处理与错误恢复
+├── core/                 ← 核心编排（orchestrator, step_runner, task_context）
+│   └── pipelines/        ← 拆分后的独立流水线（v1.4.0）
+│       ├── perception_pipeline.py  ← 感知 + 弹窗处理 + 操作前归档
+│       ├── execution_pipeline.py   ← 执行验证 + 步骤归档
+│       └── decision_engine.py      ← LLM 决策 + 响应解析 + 坐标解析
+├── device/               ← Android 设备控制（ADB / u2）
+│   ├── device_manager.py ← 设备管理器（连接/健康检查/屏幕尺寸）
+│   ├── adb_controller.py ← ADB 控制
+│   └── u2_controller.py  ← u2 控制
+├── executor/             ← 动作执行器（click/swipe/type/wait/back）
+│   ├── action_executor.py
+│   ├── click_executor.py
+│   ├── swipe_executor.py
+│   ├── type_executor.py
+│   └── wait_executor.py
+├── perception/           ← 截图/UI树/页面差异
+│   ├── screen_capture.py ← 截图与 UI 树获取
+│   ├── ui_tree.py        ← UI 树解析
+│   ├── page_diff.py      ← 页面差异对比
+│   └── image_util.py     ← 图像工具
+├── popup/                ← 弹窗检测与处理
+│   ├── popup_handler.py  ← 弹窗处理器
+│   ├── classifier.py     ← 弹窗分类
+│   ├── pattern_rules.py  ← 模式规则
+│   └── models.py         ← 弹窗数据结构
+├── llm/                  ← 横切基础服务（扁平结构，无独立适配器子包）
+│   ├── base.py           ← LLMMessage 数据类 + LLMAdapter 抽象基类
+│   ├── qwen_adapter.py   ← Qwen 多模态
+│   ├── openai_adapter.py ← OpenAI 兼容适配器（DeepSeek/LongCat/Local 复用）
+│   ├── claude_adapter.py ← Anthropic Claude
+│   ├── zhipu_adapter.py  ← 智谱 GLM 多模态
+│   ├── mimo_adapter.py   ← 小米 MiMo 多模态
+│   ├── llm_service.py    ← 工厂模式 + 能力选择
+│   ├── message_builder.py ← 已弃用（由 DecisionPromptBuilder 替代）
+│   └── token_budget.py   ← 4级动态压缩策略
+├── models/               ← 共享数据结构（action/enums/perception/task）
+├── prompts/              ← Prompt 模板（中英双语）
+├── reporting/            ← 归档与报告生成
+├── exception/            ← 异常处理与错误恢复
+└── testing/              ← 测试运行器
+```
 
 ## 设备选择
 
@@ -43,14 +65,17 @@ mobile_automation/
 
 ## 大模型配置
 
-| 供应商 | 默认模型 | 能力 | API 端点 |
-|--------|---------|------|----------|
-| **MiMo** | mimo-v2.5 | 多模态（文本+视觉+思维链） | `https://api.xiaomimimo.com/v1` |
-| **Qwen** | qwen3.6-flash | 多模态（文本+视觉） | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| **Zhipu** | glm-4.1v-thinking-flash | 多模态 | `https://open.bigmodel.cn/api/paas/v4` |
-| **DeepSeek** | deepseek-v4-flash | 纯文本 | `https://api.deepseek.com` |
-| **LongCat** | LongCat-2.0 | 纯文本 | `https://api.longcat.chat/openai` |
-| **Local** | LocalModel | 纯文本（llama-server 本地） | `http://localhost:8080/v1` |
+| 供应商 | 默认模型 | 能力 | 适配器 | API 端点 |
+|--------|---------|------|--------|----------|
+| **MiMo** | mimo-v2.5 | 多模态（文本+视觉+思维链） | MiMoAdapter | `https://api.xiaomimimo.com/v1` |
+| **Qwen** | qwen3.6-flash | 多模态（文本+视觉） | QwenAdapter | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| **Zhipu** | glm-4.1v-thinking-flash | 多模态 | ZhipuAdapter | `https://open.bigmodel.cn/api/paas/v4` |
+| **DeepSeek** | deepseek-v4-flash | 纯文本 | OpenAIAdapter（复用） | `https://api.deepseek.com` |
+| **LongCat** | LongCat-2.0 | 纯文本 | OpenAIAdapter（复用） | `https://api.longcat.chat/openai` |
+| **Local** | LocalModel | 纯文本（llama-server 本地） | OpenAIAdapter（复用） | `http://localhost:8080/v1` |
+
+> DeepSeek / LongCat / Local 均为 OpenAI 兼容协议，复用 OpenAIAdapter（无独立适配器文件），
+> 由 provider 参数驱动从 `settings.models.providers` 读取各自配置。
 
 **多模态默认**：mimo-omni（`MODELS__DEFAULT_MULTIMODAL` 可覆盖）
 **纯文本默认**：deepseek-flash（`MODELS__DEFAULT_TEXT` 可覆盖）
