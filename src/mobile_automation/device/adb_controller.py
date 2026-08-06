@@ -38,6 +38,17 @@ class ADBController:
         re.IGNORECASE,
     )
 
+    # 短信读取支持的类型（对应 content://sms 的 URI 段）
+    _SMS_TYPES = ("inbox", "sent")
+
+    # content query 行解析：
+    # - address 非贪婪，遇到首个 ", body=" 即停止
+    # - body 贪婪，可包含逗号/等号，直到行内最后一个 ", date="
+    # - date 为毫秒时间戳数字
+    _SMS_ROW_PATTERN = re.compile(
+        r"^Row:\s*\d+\s+address=(.*?),\s+body=(.*),\s+date=(\d+)\s*$"
+    )
+
     def __init__(self, serial: str, max_retries: int = 3) -> None:
         self.serial: str = serial
         self.max_retries: int = max_retries
@@ -216,6 +227,95 @@ class ADBController:
         """
         self.shell("cmd statusbar expand-notifications")
         logger.info("通知栏已展开")
+
+    def get_sms_messages(self, sms_type: str = "inbox", limit: int = 20) -> list[dict]:
+        """
+        读取设备短信（系统级能力）。
+
+        通过 content provider 查询短信数据库，支持收件箱与已发送，
+        按时间倒序返回。每条消息包含 address（号码）、body（内容）、
+        date（毫秒时间戳，已转为 int）。
+
+        参数
+        ----------
+        sms_type : str
+            短信类型："inbox"（收件箱）或 "sent"（已发送），默认 "inbox"。
+        limit : int
+            最多返回的条数，默认 20。
+
+        返回
+        -------
+        list[dict]
+            短信列表，每项形如 {"address": str, "body": str, "date": int}；
+            无结果、命令失败或解析失败时返回空列表（容错，不抛异常）。
+
+        异常
+        ------
+        ValueError
+            sms_type 非法、serial 含注入字符或 limit 非法时抛出。
+        """
+        # 1. 参数校验
+        if sms_type not in self._SMS_TYPES:
+            logger.warning("无效的短信类型: %s，仅支持 inbox/sent", sms_type)
+            raise ValueError(f"无效的短信类型: {sms_type!r}，仅支持 inbox/sent")
+
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            logger.warning("无效的 limit: %r，必须为整数", limit)
+            raise ValueError(f"limit 必须是整数: {limit!r}")
+        if limit < 0:
+            logger.warning("无效的 limit: %d，不能为负数", limit)
+            raise ValueError(f"limit 不能为负数: {limit}")
+
+        # serial 虽作为独立参数传入 subprocess 不经 shell 解析，仍统一做注入防御
+        if self._SHELL_INJECTION_PATTERN.search(self.serial):
+            logger.warning("serial 含可疑字符，已拒绝读取短信: %r", self.serial)
+            raise ValueError(f"serial 含可疑字符，已拒绝执行: {self.serial!r}")
+
+        # 2. 构造并执行 content query 命令
+        # --sort-order 的值含空格，用双引号包裹以保证设备 shell 正确传参
+        command = (
+            f"content query --uri content://sms/{sms_type} "
+            "--projection address,body,date "
+            '--sort-order "date DESC" '
+            f"--limit {limit}"
+        )
+        try:
+            stdout, stderr = self.shell(command)
+        except Exception as exc:
+            logger.error("读取短信命令执行异常: %s", exc)
+            return []
+
+        # 3. 命令失败判定：输出无效或 stderr 非空均视为失败，容错返回空列表
+        if not isinstance(stdout, str) or not stdout.strip():
+            logger.warning("读取短信命令无有效输出，stderr: %s", stderr)
+            return []
+        if stderr.strip():
+            logger.warning("读取短信命令返回 stderr，视为失败: %s", stderr.strip())
+            return []
+
+        # 4. 解析 content query 输出（逐行，跳过无法解析的行）
+        messages: list[dict] = []
+        for line in stdout.splitlines():
+            line = line.strip()
+            if not line or not line.startswith("Row:"):
+                continue
+            match = self._SMS_ROW_PATTERN.match(line)
+            if not match:
+                logger.warning("短信行解析失败，跳过: %s", line)
+                continue
+            address = match.group(1).strip()
+            body = match.group(2).strip()
+            try:
+                date = int(match.group(3))
+            except ValueError:
+                logger.warning("短信日期解析失败，跳过: %s", match.group(3))
+                continue
+            messages.append({"address": address, "body": body, "date": date})
+
+        logger.info("读取短信完成，类型: %s，条数: %d", sms_type, len(messages))
+        return messages
 
     def set_rotation(self, rotation: int = 0) -> None:
         """
