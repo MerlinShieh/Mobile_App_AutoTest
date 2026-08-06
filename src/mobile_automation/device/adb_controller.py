@@ -57,6 +57,16 @@ class ADBController:
         r"NotificationRecord\(\s*0x[0-9a-fA-F]+\s+pkg=([^\s\)]+)"
     )
 
+    # dumpsys telephony.registry 通话状态码 → 人类可读名
+    # （对应 PhoneConstants.CALL_STATE_IDLE/RINGING/OFFHOOK）
+    _CALL_STATE_NAMES = {0: "idle", 1: "ringing", 2: "offhook"}
+
+    # 通话状态字段定位：mCallState 可能出现在输出多处，取第一个有效值
+    _CALL_STATE_PATTERN = re.compile(r"mCallState=(\d+)")
+
+    # 来电号码字段定位：值取到行尾或首个逗号，防止与同行其他字段粘连
+    _CALL_INCOMING_NUMBER_PATTERN = re.compile(r"mCallIncomingNumber=([^\r\n,]*)")
+
     def __init__(self, serial: str, max_retries: int = 3) -> None:
         self.serial: str = serial
         self.max_retries: int = max_retries
@@ -516,6 +526,79 @@ class ADBController:
 
         logger.info("读取通知完成，条数: %d", len(notifications))
         return notifications[:limit]
+
+    def get_call_state(self) -> dict:
+        """
+        读取设备通话状态（系统级能力）。
+
+        通过 `dumpsys telephony.registry` 获取电话注册信息，解析通话状态
+        与来电号码，用于自动化测试中来电/通话场景的检测。
+
+        返回
+        -------
+        dict
+            形如 {"state": str, "state_code": int, "incoming_number": str}：
+            - state: idle（空闲）/ ringing（来电）/ offhook（通话中）/
+              unknown（无法解析）
+            - state_code: 原始数值（0/1/2，解析失败为 -1）
+            - incoming_number: 来电号码；无来电、未解析到或命令失败时为 ""
+
+        异常
+        ------
+        ValueError
+            serial 含注入字符时抛出。
+        """
+        # serial 虽作为独立参数传入 subprocess 不经 shell 解析，仍统一做注入防御
+        if self._SHELL_INJECTION_PATTERN.search(self.serial):
+            logger.warning("serial 含可疑字符，已拒绝读取通话状态: %r", self.serial)
+            raise ValueError(f"serial 含可疑字符，已拒绝执行: {self.serial!r}")
+
+        # 1. 执行 dumpsys telephony.registry 命令
+        try:
+            stdout, stderr = self.shell("dumpsys telephony.registry")
+        except Exception as exc:
+            logger.error("读取通话状态命令执行异常: %s", exc)
+            return {"state": "unknown", "state_code": -1, "incoming_number": ""}
+
+        # 2. 命令失败判定：输出无效或 stderr 非空均视为失败，容错返回 unknown
+        if not isinstance(stdout, str) or not stdout.strip():
+            logger.warning("读取通话状态命令无有效输出，stderr: %s", stderr)
+            return {"state": "unknown", "state_code": -1, "incoming_number": ""}
+        if stderr.strip():
+            logger.warning("读取通话状态命令返回 stderr，视为失败: %s", stderr.strip())
+            return {"state": "unknown", "state_code": -1, "incoming_number": ""}
+
+        # 3. 解析通话状态码（mCallState 可能出现在输出多处，取第一个有效值）
+        state_match = self._CALL_STATE_PATTERN.search(stdout)
+        if not state_match:
+            logger.warning("通话状态输出中未找到 mCallState 字段，视为 unknown")
+            return {"state": "unknown", "state_code": -1, "incoming_number": ""}
+        try:
+            state_code = int(state_match.group(1))
+        except ValueError:
+            logger.warning("通话状态码解析失败: %r", state_match.group(1))
+            return {"state": "unknown", "state_code": -1, "incoming_number": ""}
+
+        # 4. 状态码 → 人类可读名；未知数值保留原始 code，state 记 unknown
+        state = self._CALL_STATE_NAMES.get(state_code, "unknown")
+
+        # 5. 解析来电号码（无该字段或值为空时返回 ""）
+        incoming_number = ""
+        number_match = self._CALL_INCOMING_NUMBER_PATTERN.search(stdout)
+        if number_match:
+            incoming_number = number_match.group(1).strip()
+
+        logger.info(
+            "读取通话状态完成，state: %s (%d)，incoming_number: %s",
+            state,
+            state_code,
+            incoming_number or "(无)",
+        )
+        return {
+            "state": state,
+            "state_code": state_code,
+            "incoming_number": incoming_number,
+        }
 
     def set_rotation(self, rotation: int = 0) -> None:
         """
