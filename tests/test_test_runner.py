@@ -172,7 +172,7 @@ class TestBatchTestRunner:
         assert summary.total >= 1
 
     def test_from_json(self, mock_orchestrator):
-        """验证从 JSON 文件加载用例。"""
+        """验证从 JSON 文件加载用例并批量执行。"""
         with tempfile.TemporaryDirectory() as tmpdir:
             json_path = Path(tmpdir) / "test_cases.json"
             cases_data = [
@@ -183,15 +183,85 @@ class TestBatchTestRunner:
                 json.dump(cases_data, f, ensure_ascii=False)
 
             runner = BatchTestRunner.from_json(mock_orchestrator, str(json_path))
-            summary = runner.run_all(
-                [TestCase(goal="打开设置"), TestCase(goal="打开相机")]
-            )
+            # 直接执行 from_json 已填充的 _cases
+            summary = runner.run_all(runner._cases)
             assert summary.total == 2
+            # 第一个用例预期 completed，通过；第二个预期 aborted，实际 completed，不通过
+            assert summary.results[0].passed is True
+            assert summary.results[1].passed is False
+
+    def test_from_json_populates_cases(self, mock_orchestrator):
+        """验证 from_json 返回的 runner._cases 非空且内容正确。"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            json_path = Path(tmpdir) / "test_cases.json"
+            cases_data = [
+                {
+                    "goal": "打开设置",
+                    "max_steps": 10,
+                    "expected_status": "completed",
+                    "description": "冒烟",
+                    "tags": ["smoke", "settings"],
+                    "timeout_seconds": 120,
+                },
+                {"goal": "打开相机", "expected_status": "aborted"},
+            ]
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(cases_data, f, ensure_ascii=False)
+
+            runner = BatchTestRunner.from_json(mock_orchestrator, str(json_path))
+            assert len(runner._cases) == 2
+            first = runner._cases[0]
+            assert first.goal == "打开设置"
+            assert first.max_steps == 10
+            assert first.expected_status == "completed"
+            assert first.description == "冒烟"
+            assert first.tags == ["smoke", "settings"]
+            assert first.timeout_seconds == 120
+            # 未提供的字段使用默认值
+            second = runner._cases[1]
+            assert second.goal == "打开相机"
+            assert second.max_steps == 0
+            assert second.expected_status == "aborted"
+            assert second.tags == []
 
     def test_from_json_file_not_found(self, mock_orchestrator):
         """验证 JSON 文件不存在时抛出异常。"""
         with pytest.raises(FileNotFoundError):
             BatchTestRunner.from_json(mock_orchestrator, "/not/exist.json")
+
+    def test_run_from_file_reads_file_once(self, mock_orchestrator, mocker):
+        """验证 run_from_file 只读取 JSON 文件一次（消除重复解析）。"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            json_path = Path(tmpdir) / "test_cases.json"
+            cases_data = [
+                {"goal": "打开设置"},
+                {"goal": "打开相机"},
+            ]
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(cases_data, f, ensure_ascii=False)
+
+            runner = BatchTestRunner(mock_orchestrator)
+            json_spy = mocker.spy(json, "load")
+            summary = runner.run_from_file(str(json_path))
+            assert summary.total == 2
+            assert summary.passed == 2
+            # from_json 内部读取一次即完成加载，不再二次解析
+            assert json_spy.call_count == 1
+
+    def test_run_from_file_saves_report(self, mock_orchestrator, mocker, tmp_path):
+        """验证 run_from_file 指定 output_path 时保存报告。"""
+        json_path = tmp_path / "test_cases.json"
+        json_path.write_text(
+            json.dumps([{"goal": "打开设置"}], ensure_ascii=False),
+            encoding="utf-8",
+        )
+        runner = BatchTestRunner(mock_orchestrator)
+        save_spy = mocker.spy(runner, "save_report")
+        output = tmp_path / "report.json"
+        summary = runner.run_from_file(str(json_path), output_path=str(output))
+        assert summary.total == 1
+        save_spy.assert_called_once()
+        assert output.exists()
 
     def test_save_report(self, mock_orchestrator):
         """验证报告保存为 JSON。"""

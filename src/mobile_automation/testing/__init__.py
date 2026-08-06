@@ -19,7 +19,6 @@ from typing import Any, Optional
 
 from ..config import settings
 from ..core.orchestrator import TaskOrchestrator
-from ..llm.token_budget import TokenBudgetManager
 from ..logger import get_logger
 from ..models.enums import TaskStatus
 from ..models.task import TaskContext
@@ -57,6 +56,70 @@ class TestCase:
     tags: list[str] = field(default_factory=list)
     timeout_seconds: int = 0
     __test__ = False  # 数据类，非 pytest 测试类
+
+
+def parse_test_cases(data: list[dict]) -> list[TestCase]:
+    """
+    将 JSON 解析出的字典列表统一映射为 TestCase 列表。
+
+    这是 JSON → TestCase 字段映射的唯一权威实现，from_json / run_from_file /
+    load_cases 均复用本函数，避免字段映射逻辑多处重复。
+
+    参数
+    ----------
+    data : list[dict]
+        json.load 解析出的原始用例字典列表。
+
+    返回
+    -------
+    list[TestCase]
+        映射后的测试用例列表。
+    """
+    return [
+        TestCase(
+            goal=item["goal"],
+            max_steps=item.get("max_steps", 0),
+            expected_status=item.get("expected_status", "completed"),
+            description=item.get("description", ""),
+            tags=item.get("tags", []),
+            timeout_seconds=item.get("timeout_seconds", 0),
+        )
+        for item in data
+    ]
+
+
+def load_test_cases(json_path: str) -> list[TestCase]:
+    """
+    从 JSON 文件读取并解析测试用例列表。
+
+    文件读取的唯一权威入口（配合 parse_test_cases 完成字段映射），
+    BatchTestRunner.from_json 与 main.load_cases 均复用本函数。
+
+    参数
+    ----------
+    json_path : str
+        JSON 用例文件路径。
+
+    返回
+    -------
+    list[TestCase]
+        解析出的测试用例列表。
+
+    异常
+    ------
+    FileNotFoundError
+        JSON 文件不存在时抛出。
+    json.JSONDecodeError
+        JSON 格式错误时抛出。
+    """
+    path = Path(json_path)
+    if not path.exists():
+        raise FileNotFoundError(f"测试用例文件不存在: {json_path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        data: list[dict] = json.load(f)
+
+    return parse_test_cases(data)
 
 
 @dataclass
@@ -156,7 +219,8 @@ class BatchTestRunner:
             已初始化的任务编排器实例。
         """
         self._orchestrator: TaskOrchestrator = orchestrator
-        self._token_budget: TokenBudgetManager = orchestrator._token_budget
+        # 从 JSON 文件加载的用例列表（由 from_json 填充，空列表表示未加载）
+        self._cases: list[TestCase] = []
 
     @classmethod
     def from_json(cls, orchestrator: TaskOrchestrator, json_path: str) -> "BatchTestRunner":
@@ -202,19 +266,10 @@ class BatchTestRunner:
         with open(path, "r", encoding="utf-8") as f:
             data: list[dict] = json.load(f)
 
-        cases: list[TestCase] = [
-            TestCase(
-                goal=item["goal"],
-                max_steps=item.get("max_steps", 0),
-                expected_status=item.get("expected_status", "completed"),
-                description=item.get("description", ""),
-                tags=item.get("tags", []),
-                timeout_seconds=item.get("timeout_seconds", 0),
-            )
-            for item in data
-        ]
+        cases: list[TestCase] = parse_test_cases(data)
 
         runner = cls(orchestrator)
+        runner._cases = cases
         logger.info("从 JSON 文件加载 %d 个测试用例: %s", len(cases), json_path)
         return runner
 
@@ -370,21 +425,8 @@ class BatchTestRunner:
             汇总结果。
         """
         runner = self.from_json(self._orchestrator, json_path)
-        # 恢复用原来的 cases 列表
-        with open(json_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        cases = [
-            TestCase(
-                goal=item["goal"],
-                max_steps=item.get("max_steps", 0),
-                expected_status=item.get("expected_status", "completed"),
-                description=item.get("description", ""),
-                tags=item.get("tags", []),
-                timeout_seconds=item.get("timeout_seconds", 0),
-            )
-            for item in data
-        ]
-        summary = self.run_all(cases, stop_on_failure=stop_on_failure)
+        # 直接复用 from_json 已填充的 _cases，避免重复读取文件与字段映射
+        summary = self.run_all(runner._cases, stop_on_failure=stop_on_failure)
         if output_path:
             self.save_report(summary, output_path)
         return summary

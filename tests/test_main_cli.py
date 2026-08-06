@@ -116,6 +116,27 @@ class TestLoadCases:
         with pytest.raises(FileNotFoundError):
             main.load_cases("/not/exist.json")
 
+    def test_load_cases_delegates_to_testing_loader(self, tmp_path, mocker):
+        """验证 load_cases 复用 testing 包的 load_test_cases（消除重复字段映射）。"""
+        json_path = tmp_path / "cases.json"
+        json_path.write_text(
+            json.dumps([{"goal": "打开设置", "max_steps": 5}], ensure_ascii=False),
+            encoding="utf-8",
+        )
+        spy = mocker.spy(main, "load_test_cases")
+        cases = main.load_cases(str(json_path))
+        assert len(cases) == 1
+        assert cases[0].goal == "打开设置"
+        assert cases[0].max_steps == 5
+        assert spy.call_count == 1
+
+    def test_load_cases_invalid_json(self, tmp_path):
+        """验证 JSON 格式错误时抛出 JSONDecodeError。"""
+        json_path = tmp_path / "bad.json"
+        json_path.write_text("{invalid json", encoding="utf-8")
+        with pytest.raises(json.JSONDecodeError):
+            main.load_cases(str(json_path))
+
 
 class TestRunBatchTests:
     """run_batch_tests 分发逻辑测试（mock BatchTestRunner）。"""

@@ -43,7 +43,7 @@ from .logger import get_logger, setup_logger, log_step_progress, log_task_start,
 from .models.task import TaskContext
 from .perception.screen_capture import ScreenCapture
 from .popup.popup_handler import PopupHandler
-from .testing import BatchTestRunner, TestCase, TestSummary
+from .testing import BatchTestRunner, TestCase, TestSummary, load_test_cases
 
 logger = get_logger(__name__)
 
@@ -352,6 +352,9 @@ def load_cases(json_path: str) -> list[TestCase]:
     """
     从 JSON 文件加载测试用例列表。
 
+    复用 testing 包的 load_test_cases 权威实现（含 parse_test_cases 字段映射），
+    避免字段映射逻辑在 CLI 层重复维护。
+
     JSON 文件格式（与 BatchTestRunner.TestCase 字段一致）：
     ```json
     [
@@ -380,25 +383,10 @@ def load_cases(json_path: str) -> list[TestCase]:
     ------
     FileNotFoundError
         JSON 文件不存在时抛出。
+    json.JSONDecodeError
+        JSON 格式错误时抛出。
     """
-    path = Path(json_path)
-    if not path.exists():
-        raise FileNotFoundError(f"测试用例文件不存在: {json_path}")
-
-    with open(path, "r", encoding="utf-8") as f:
-        data: list[dict] = json.load(f)
-
-    return [
-        TestCase(
-            goal=item["goal"],
-            max_steps=item.get("max_steps", 0),
-            expected_status=item.get("expected_status", "completed"),
-            description=item.get("description", ""),
-            tags=item.get("tags", []),
-            timeout_seconds=item.get("timeout_seconds", 0),
-        )
-        for item in data
-    ]
+    return load_test_cases(json_path)
 
 
 def _summary_to_json(summary: TestSummary) -> dict[str, Any]:
