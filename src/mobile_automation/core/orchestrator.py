@@ -75,6 +75,7 @@ class TaskOrchestrator:
         self,
         user_goal: str,
         max_steps: Optional[int] = None,
+        max_duration: Optional[float] = None,
     ) -> TaskContext:
         """
         执行一个完整的自动化任务。
@@ -92,6 +93,9 @@ class TaskOrchestrator:
             用户输入的原始任务描述。
         max_steps : Optional[int]
             任务允许的最大步数，为 None 时从配置读取。
+        max_duration : Optional[float]
+            任务级最大耗时（秒），为 None 时使用全局配置
+            settings.execution.max_total_duration_seconds。
 
         返回
         -------
@@ -123,7 +127,7 @@ class TaskOrchestrator:
         while not context.is_completed() and (
             context.max_steps == 0 or context.current_step < context.max_steps
         ):
-            if self._check_timeout(context):
+            if self._check_timeout(context, max_duration):
                 context.status = TaskStatus.FAILED
                 logger.warning("任务 %s 超时，已执行 %d 步", context.task_id, context.current_step)
                 break
@@ -210,7 +214,7 @@ class TaskOrchestrator:
                      context.task_id, context.status.value, context.current_step, context.total_tokens_used)
         return context
 
-    def _check_timeout(self, context: TaskContext) -> bool:
+    def _check_timeout(self, context: TaskContext, max_duration: Optional[float] = None) -> bool:
         """
         检查任务是否已超时。
 
@@ -218,17 +222,24 @@ class TaskOrchestrator:
         ----------
         context : TaskContext
             当前任务上下文。
+        max_duration : Optional[float]
+            任务级最大耗时（秒），为 None 时回退到全局配置
+            settings.execution.max_total_duration_seconds。
 
         返回
         -------
         bool
             True 表示任务已超时。
         """
-        max_duration: int = settings.execution.max_total_duration_seconds
-        if context.is_timeout(max_duration_seconds=max_duration):
+        max_duration_seconds: float = (
+            max_duration
+            if max_duration is not None
+            else settings.execution.max_total_duration_seconds
+        )
+        if context.is_timeout(max_duration_seconds=max_duration_seconds):
             elapsed: int = int((datetime.now() - context.created_at).total_seconds())
-            logger.warning("任务 %s 超时: 已执行 %ds，限制 %ds",
-                           context.task_id, elapsed, max_duration)
+            logger.warning("任务 %s 超时: 已执行 %ds，限制 %ss",
+                           context.task_id, elapsed, max_duration_seconds)
             return True
         return False
 

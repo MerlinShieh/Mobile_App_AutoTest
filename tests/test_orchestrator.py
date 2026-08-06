@@ -6,6 +6,7 @@
 
 import pytest
 
+from mobile_automation.config import settings
 from mobile_automation.core.orchestrator import TaskOrchestrator
 from mobile_automation.models.action import Action, ActionParams
 from mobile_automation.models.enums import ActionType, StepStatus, TaskStatus
@@ -108,6 +109,68 @@ class TestTaskOrchestrator:
 
         context = orchestrator.execute_task(user_goal="测试超时", max_steps=30)
         assert context.status == TaskStatus.FAILED
+
+    def test_execute_task_max_duration_applied(self, mocker):
+        """验证用例级 max_duration 生效：超时判断使用该值并终止任务。"""
+        mock_step_runner = mocker.MagicMock()
+        mock_token_budget = mocker.MagicMock()
+
+        mock_context = mocker.MagicMock()
+        mock_context.is_completed.return_value = False
+        mock_context.is_timeout.return_value = True
+        mock_context.current_step = 0
+        mock_context.max_steps = 30
+        mock_context.status = TaskStatus.RUNNING
+        mock_context.task_id = "test-max-duration"
+        mock_context.user_goal = "测试用例级超时"
+        mock_context.page_history = []
+        mock_context.total_tokens_used = 0
+
+        mocker.patch("mobile_automation.core.orchestrator.TaskContext", return_value=mock_context)
+
+        orchestrator = TaskOrchestrator(
+            step_runner=mock_step_runner,
+            token_budget=mock_token_budget,
+        )
+
+        context = orchestrator.execute_task(
+            user_goal="测试用例级超时", max_steps=30, max_duration=10.0
+        )
+        assert context.status == TaskStatus.FAILED
+        # 超时判断必须收到用例级 max_duration，而非全局配置
+        mock_context.is_timeout.assert_called_once_with(max_duration_seconds=10.0)
+
+    def test_execute_task_max_duration_none_falls_back_to_global(self, mocker):
+        """验证 max_duration=None 时回退全局超时配置。"""
+        mock_step_runner = mocker.MagicMock()
+        mock_token_budget = mocker.MagicMock()
+
+        mock_context = mocker.MagicMock()
+        mock_context.is_completed.return_value = False
+        mock_context.is_timeout.return_value = True
+        mock_context.current_step = 0
+        mock_context.max_steps = 30
+        mock_context.status = TaskStatus.RUNNING
+        mock_context.task_id = "test-global-timeout"
+        mock_context.user_goal = "测试全局超时"
+        mock_context.page_history = []
+        mock_context.total_tokens_used = 0
+
+        mocker.patch("mobile_automation.core.orchestrator.TaskContext", return_value=mock_context)
+
+        orchestrator = TaskOrchestrator(
+            step_runner=mock_step_runner,
+            token_budget=mock_token_budget,
+        )
+
+        context = orchestrator.execute_task(
+            user_goal="测试全局超时", max_steps=30, max_duration=None
+        )
+        assert context.status == TaskStatus.FAILED
+        # 未传 max_duration 时必须使用全局配置
+        mock_context.is_timeout.assert_called_once_with(
+            max_duration_seconds=settings.execution.max_total_duration_seconds
+        )
 
     def test_detect_loop_returns_true(self, mocker):
         """验证 _detect_loop 在连续相同操作时返回 True。"""

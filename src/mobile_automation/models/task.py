@@ -166,13 +166,13 @@ class TaskContext:
         """
         return self.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.ABORTED)
 
-    def is_timeout(self, max_duration_seconds: int = 300) -> bool:
+    def is_timeout(self, max_duration_seconds: float = 300) -> bool:
         """
         判断任务是否已超时。
 
         参数
         ----------
-        max_duration_seconds : int
+        max_duration_seconds : float
             最大允许持续时间（秒），默认 300 秒（5 分钟）。
 
         返回

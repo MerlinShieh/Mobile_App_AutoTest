@@ -46,7 +46,8 @@ class TestCase:
     tags : list[str]
         可选的标签列表，用于用例分组和筛选。
     timeout_seconds : int
-        用例级超时时间（秒），0 表示使用配置默认值。
+        用例级超时时间（秒），0 表示不覆盖、使用全局配置
+        settings.execution.max_total_duration_seconds。
     """
 
     goal: str
@@ -409,6 +410,8 @@ class BatchTestRunner:
             context: TaskContext = self._orchestrator.execute_task(
                 user_goal=case.goal,
                 max_steps=case.max_steps if case.max_steps > 0 else None,
+                # timeout_seconds > 0 时使用用例级超时，否则走全局超时
+                max_duration=case.timeout_seconds if case.timeout_seconds > 0 else None,
             )
 
             result.status = context.status.value

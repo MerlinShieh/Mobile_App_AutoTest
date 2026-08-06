@@ -89,7 +89,7 @@ class TestBatchTestRunner:
         token_budget.reset = mocker.MagicMock()
         orchestrator._token_budget = token_budget
 
-        def mock_execute_task(user_goal, max_steps=None):
+        def mock_execute_task(user_goal, max_steps=None, max_duration=None):
             context = mocker.MagicMock(spec=TaskContext)
             context.task_id = "test_" + user_goal[:4]
             context.status = TaskStatus.COMPLETED
@@ -123,7 +123,7 @@ class TestBatchTestRunner:
         runner = BatchTestRunner(mock_orchestrator)
         call_count = [0]
 
-        def mock_execute_with_fail(user_goal, max_steps=None):
+        def mock_execute_with_fail(user_goal, max_steps=None, max_duration=None):
             call_count[0] += 1
             context = MagicMock(spec=TaskContext)
             context.task_id = f"test_{call_count[0]}"
@@ -150,7 +150,7 @@ class TestBatchTestRunner:
         runner = BatchTestRunner(mock_orchestrator)
         call_count = [0]
 
-        def mock_execute_stop(user_goal, max_steps=None):
+        def mock_execute_stop(user_goal, max_steps=None, max_duration=None):
             call_count[0] += 1
             context = MagicMock(spec=TaskContext)
             context.task_id = f"test_{call_count[0]}"
@@ -209,7 +209,7 @@ class TestBatchTestRunner:
 
     def test_run_single_exception(self, mock_orchestrator):
         """验证单用例异常处理。"""
-        def mock_execute_error(user_goal, max_steps=None):
+        def mock_execute_error(user_goal, max_steps=None, max_duration=None):
             raise RuntimeError("设备连接失败")
 
         mock_orchestrator.execute_task = mock_execute_error
@@ -217,6 +217,66 @@ class TestBatchTestRunner:
         result = runner._run_single(TestCase(goal="会失败的用例"))
         assert result.passed is False
         assert "设备连接失败" in result.error_message
+
+    def test_run_single_passes_case_timeout(self, mock_orchestrator, mocker):
+        """验证 timeout_seconds > 0 时用例级超时透传给 execute_task。"""
+        mock_exec = mocker.MagicMock()
+        context = mocker.MagicMock(spec=TaskContext)
+        context.status = TaskStatus.COMPLETED
+        context.current_step = 1
+        context.total_tokens_used = 0
+        context.get_success_rate.return_value = 1.0
+        mock_exec.return_value = context
+        mock_orchestrator.execute_task = mock_exec
+
+        runner = BatchTestRunner(mock_orchestrator)
+        runner._run_single(TestCase(goal="超时用例", timeout_seconds=120))
+
+        mock_exec.assert_called_once_with(
+            user_goal="超时用例",
+            max_steps=None,
+            max_duration=120,
+        )
+
+    def test_run_single_timeout_zero_uses_global(self, mock_orchestrator, mocker):
+        """验证 timeout_seconds = 0 时不覆盖全局超时（max_duration 为 None）。"""
+        mock_exec = mocker.MagicMock()
+        context = mocker.MagicMock(spec=TaskContext)
+        context.status = TaskStatus.COMPLETED
+        context.current_step = 1
+        context.total_tokens_used = 0
+        context.get_success_rate.return_value = 1.0
+        mock_exec.return_value = context
+        mock_orchestrator.execute_task = mock_exec
+
+        runner = BatchTestRunner(mock_orchestrator)
+        runner._run_single(TestCase(goal="默认超时用例", timeout_seconds=0))
+
+        mock_exec.assert_called_once_with(
+            user_goal="默认超时用例",
+            max_steps=None,
+            max_duration=None,
+        )
+
+    def test_run_single_timeout_with_max_steps(self, mock_orchestrator, mocker):
+        """验证超时透传与 max_steps 透传互不干扰。"""
+        mock_exec = mocker.MagicMock()
+        context = mocker.MagicMock(spec=TaskContext)
+        context.status = TaskStatus.COMPLETED
+        context.current_step = 1
+        context.total_tokens_used = 0
+        context.get_success_rate.return_value = 1.0
+        mock_exec.return_value = context
+        mock_orchestrator.execute_task = mock_exec
+
+        runner = BatchTestRunner(mock_orchestrator)
+        runner._run_single(TestCase(goal="组合用例", max_steps=8, timeout_seconds=60))
+
+        mock_exec.assert_called_once_with(
+            user_goal="组合用例",
+            max_steps=8,
+            max_duration=60,
+        )
 
     def test_save_report_creates_dir(self, mock_orchestrator):
         """验证保存报告时自动创建目录。"""
