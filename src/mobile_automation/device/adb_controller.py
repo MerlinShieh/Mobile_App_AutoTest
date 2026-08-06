@@ -50,6 +50,13 @@ class ADBController:
         r"^Row:\s*\d+\s+address=(.*?),\s+body=(.*),\s+date=(\d+)\s*$"
     )
 
+    # dumpsys notification 输出中 NotificationRecord 段落定位：
+    # 形如 NotificationRecord(0x0197e345 pkg=com.android.mms user=... )，
+    # 捕获 pkg 之后的包名（到空白或右括号为止）。
+    _NOTIFICATION_RECORD_PATTERN = re.compile(
+        r"NotificationRecord\(\s*0x[0-9a-fA-F]+\s+pkg=([^\s\)]+)"
+    )
+
     def __init__(self, serial: str, max_retries: int = 3) -> None:
         self.serial: str = serial
         self.max_retries: int = max_retries
@@ -404,6 +411,111 @@ class ADBController:
         logger.info("写入剪贴板完成，长度: %d", len(text))
         return True
 
+    @staticmethod
+    def _extract_bundle_value(block: str, key: str) -> str:
+        """
+        从通知段落文本中提取指定 Bundle key 的值（兼容多种格式）。
+
+        dumpsys notification --noredact 输出中 extra 的展示格式不固定，
+        常见两种：
+        - key=StringValue{内容}（对象包裹）
+        - key=内容（直接明文，如 android.title=验证码通知）
+        按优先级依次尝试，均失败返回空字符串（容错，不抛异常）。
+
+        参数
+        ----------
+        block : str
+            NotificationRecord 段落文本。
+        key : str
+            要提取的 extra key，如 "android.title" / "android.text"。
+
+        返回
+        -------
+        str
+            提取到的值（已 trim）；未找到时返回 ""。
+        """
+        # 格式1: key=StringValue{...}，非贪婪匹配到首个右花括号
+        match = re.search(
+            rf"{re.escape(key)}=StringValue\{{(.*?)\}}", block, re.DOTALL
+        )
+        if match:
+            return match.group(1).strip()
+        # 格式2: key=值（取到行尾）
+        match = re.search(rf"{re.escape(key)}=([^\r\n]+)", block)
+        if match:
+            return match.group(1).strip()
+        return ""
+
+    def get_notifications(self, limit: int = 20) -> list[dict]:
+        """
+        读取系统通知（系统级能力）。
+
+        通过 `dumpsys notification --noredact` 读取通知列表（--noredact
+        显示完整文本）。解析输出中的 NotificationRecord 条目，提取每个
+        通知的包名、标题与正文。无通知、命令失败或解析失败时返回空列表
+        （容错，不抛异常）。返回顺序遵循 dumpsys 输出顺序（系统通常
+        按通知时间排列）。
+
+        参数
+        ----------
+        limit : int
+            最多返回的条数，默认 20。
+
+        返回
+        -------
+        list[dict]
+            通知列表，每项形如 {"package": str, "title": str, "text": str}；
+            title/text 提取失败时为 ""。
+
+        异常
+        ------
+        ValueError
+            limit 非法或 serial 含注入字符时抛出。
+        """
+        # 1. 参数校验
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            logger.warning("无效的 limit: %r，必须为整数", limit)
+            raise ValueError(f"limit 必须是整数: {limit!r}")
+        if limit < 0:
+            logger.warning("无效的 limit: %d，不能为负数", limit)
+            raise ValueError(f"limit 不能为负数: {limit}")
+
+        # serial 虽作为独立参数传入 subprocess 不经 shell 解析，仍统一做注入防御
+        if self._SHELL_INJECTION_PATTERN.search(self.serial):
+            logger.warning("serial 含可疑字符，已拒绝读取通知: %r", self.serial)
+            raise ValueError(f"serial 含可疑字符，已拒绝执行: {self.serial!r}")
+
+        # 2. 构造并执行 dumpsys notification 命令
+        try:
+            stdout, stderr = self.shell("dumpsys notification --noredact")
+        except Exception as exc:
+            logger.error("读取通知命令执行异常: %s", exc)
+            return []
+
+        # 3. 命令失败判定：输出无效或 stderr 非空均视为失败，容错返回空列表
+        if not isinstance(stdout, str) or not stdout.strip():
+            logger.warning("读取通知命令无有效输出，stderr: %s", stderr)
+            return []
+        if stderr.strip():
+            logger.warning("读取通知命令返回 stderr，视为失败: %s", stderr.strip())
+            return []
+
+        # 4. 定位 NotificationRecord 段落并解析
+        matches = list(self._NOTIFICATION_RECORD_PATTERN.finditer(stdout))
+        notifications: list[dict] = []
+        for idx, match in enumerate(matches):
+            package = match.group(1)
+            block_start = match.start()
+            block_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(stdout)
+            block = stdout[block_start:block_end]
+            title = self._extract_bundle_value(block, "android.title")
+            text = self._extract_bundle_value(block, "android.text")
+            notifications.append({"package": package, "title": title, "text": text})
+
+        logger.info("读取通知完成，条数: %d", len(notifications))
+        return notifications[:limit]
 
     def set_rotation(self, rotation: int = 0) -> None:
         """
