@@ -67,6 +67,12 @@ class ADBController:
     # 来电号码字段定位：值取到行尾或首个逗号，防止与同行其他字段粘连
     _CALL_INCOMING_NUMBER_PATTERN = re.compile(r"mCallIncomingNumber=([^\r\n,]*)")
 
+    # 包名校验：仅允许字母数字、下划线与点（对应 Android 包名规范）
+    _PACKAGE_PATTERN = re.compile(r"^[a-zA-Z0-9_.]+$")
+
+    # wm size 输出中的物理分辨率定位：形如 "Physical size: 1440x3200"
+    _PHYSICAL_SIZE_PATTERN = re.compile(r"Physical size:\s*(\d+)x(\d+)")
+
     def __init__(self, serial: str, max_retries: int = 3) -> None:
         self.serial: str = serial
         self.max_retries: int = max_retries
@@ -678,3 +684,469 @@ class ADBController:
 
         logger.warning("等待设备就绪超时: %s", self.serial)
         return False
+
+    # ------------------------------------------------------------------
+    # 基础交互命令封装（u2 会话异常时的 ADB 兜底通道）
+    # 以下方法统一复用 shell() 与 _SHELL_INJECTION_PATTERN 防御：
+    # 执行前校验 serial 注入、参数合法性；执行失败一律返回安全默认值，
+    # 不向上抛异常（参数校验 / serial 注入除外，抛 ValueError）。
+    # ------------------------------------------------------------------
+
+    def _assert_serial_safe(self) -> None:
+        """
+        serial 注入防御检查。
+
+        serial 虽作为独立参数传入 subprocess 不经 shell 解析，仍统一做
+        注入防御，与既有读取类方法（短信/剪贴板/通知/通话）保持一致。
+
+        异常
+        ------
+        ValueError
+            serial 含注入字符时抛出。
+        """
+        if self._SHELL_INJECTION_PATTERN.search(self.serial):
+            logger.warning("serial 含可疑字符，已拒绝执行: %r", self.serial)
+            raise ValueError(f"serial 含可疑字符，已拒绝执行: {self.serial!r}")
+
+    @staticmethod
+    def _validate_coordinate(value: int, name: str) -> int:
+        """
+        校验屏幕坐标参数为非负整数。
+
+        参数
+        ----------
+        value : int
+            待校验的坐标值。
+        name : str
+            参数名（用于错误信息，如 "x" / "y" / "x1"）。
+
+        返回
+        -------
+        int
+            校验通过后的坐标值。
+
+        异常
+        ------
+        ValueError
+            坐标为 bool、非 int 或负数时抛出。
+        """
+        if isinstance(value, bool) or not isinstance(value, int):
+            logger.warning("无效的 %s: %r，必须为非负整数", name, value)
+            raise ValueError(f"{name} 必须是非负整数: {value!r}")
+        if value < 0:
+            logger.warning("无效的 %s: %d，不能为负数", name, value)
+            raise ValueError(f"{name} 不能为负数: {value}")
+        return value
+
+    def _run_shell_bool(self, command: str, action: str) -> bool:
+        """
+        执行单条 shell 命令并返回 bool 结果。
+
+        shell 抛异常或 stderr 非空均视为失败，返回 False（容错，不抛出）。
+
+        参数
+        ----------
+        command : str
+            待执行的 shell 命令。
+        action : str
+            操作名（用于日志前缀，如 "点击" / "滑动"）。
+
+        返回
+        -------
+        bool
+            True 表示执行成功（无异常且 stderr 为空）；False 表示失败。
+        """
+        try:
+            _, stderr = self.shell(command)
+        except Exception as exc:
+            logger.error("%s命令执行异常: %s", action, exc)
+            return False
+        if stderr.strip():
+            logger.warning("%s命令返回 stderr，视为失败: %s", action, stderr.strip())
+            return False
+        return True
+
+    def input_tap(self, x: int, y: int) -> bool:
+        """
+        模拟点击屏幕坐标。
+
+        通过 ADB input tap 在指定屏幕坐标 (x, y) 处执行点击。
+
+        参数
+        ----------
+        x : int
+            横坐标（非负整数，像素）。
+        y : int
+            纵坐标（非负整数，像素）。
+
+        返回
+        -------
+        bool
+            True 表示命令执行成功；False 表示失败（shell 异常或 stderr 非空）。
+
+        异常
+        ------
+        ValueError
+            坐标非法或 serial 含注入字符时抛出。
+        """
+        x = self._validate_coordinate(x, "x")
+        y = self._validate_coordinate(y, "y")
+        self._assert_serial_safe()
+        return self._run_shell_bool(f"input tap {x} {y}", "点击")
+
+    def input_swipe(
+        self,
+        x1: int,
+        y1: int,
+        x2: int,
+        y2: int,
+        duration_ms: int = 300,
+    ) -> bool:
+        """
+        模拟滑动屏幕。
+
+        通过 ADB input swipe 从 (x1, y1) 滑动到 (x2, y2)，持续
+        duration_ms 毫秒。
+
+        参数
+        ----------
+        x1 : int
+            起点横坐标（非负整数）。
+        y1 : int
+            起点纵坐标（非负整数）。
+        x2 : int
+            终点横坐标（非负整数）。
+        y2 : int
+            终点纵坐标（非负整数）。
+        duration_ms : int
+            滑动持续时间（毫秒），默认 300。
+
+        返回
+        -------
+        bool
+            True 表示命令执行成功；False 表示失败。
+
+        异常
+        ------
+        ValueError
+            坐标或 duration_ms 非法、serial 含注入字符时抛出。
+        """
+        x1 = self._validate_coordinate(x1, "x1")
+        y1 = self._validate_coordinate(y1, "y1")
+        x2 = self._validate_coordinate(x2, "x2")
+        y2 = self._validate_coordinate(y2, "y2")
+        if isinstance(duration_ms, bool) or not isinstance(duration_ms, int):
+            logger.warning("无效的 duration_ms: %r，必须为整数", duration_ms)
+            raise ValueError(f"duration_ms 必须是整数: {duration_ms!r}")
+        if duration_ms < 0:
+            logger.warning("无效的 duration_ms: %d，不能为负数", duration_ms)
+            raise ValueError(f"duration_ms 不能为负数: {duration_ms}")
+        self._assert_serial_safe()
+        return self._run_shell_bool(
+            f"input swipe {x1} {y1} {x2} {y2} {duration_ms}", "滑动"
+        )
+
+    def input_text(self, text: str) -> bool:
+        """
+        输入文本。
+
+        通过 ADB input text 向当前焦点输入框输入文本。文本经
+        shlex.quote 转义，保证含空格/引号等特殊字符时在设备 shell 中
+        正确传参。含非 ASCII 字符（中文等）时 input text 在部分设备
+        上支持不稳定，记录警告后仍尝试原样传递（不阻断）。
+
+        参数
+        ----------
+        text : str
+            要输入的文本内容。
+
+        返回
+        -------
+        bool
+            True 表示输入成功；False 表示失败（text 为空/None、
+            shell 异常或 stderr 非空）。
+
+        异常
+        ------
+        ValueError
+            serial 含注入字符时抛出。
+        """
+        self._assert_serial_safe()
+        if not text:
+            logger.warning("输入文本失败: 文本为空或 None")
+            return False
+
+        if any(ord(ch) > 127 for ch in text):
+            logger.warning(
+                "input text 含非 ASCII 字符（中文等），设备支持不稳定，"
+                "尝试原样传递: %r",
+                text,
+            )
+
+        command = f"input text {shlex.quote(text)}"
+        return self._run_shell_bool(command, "输入文本")
+
+    def input_keyevent(self, keycode: int) -> bool:
+        """
+        发送按键事件。
+
+        通过 ADB input keyevent 发送指定 keycode 的按键事件。
+
+        参数
+        ----------
+        keycode : int
+            Android 标准 keycode（如 4=返回、3=Home、187=最近任务）。
+
+        返回
+        -------
+        bool
+            True 表示命令执行成功；False 表示失败。
+
+        异常
+        ------
+        ValueError
+            keycode 非整数或 serial 含注入字符时抛出。
+        """
+        self._assert_serial_safe()
+        if isinstance(keycode, bool) or not isinstance(keycode, int):
+            logger.warning("无效的 keycode: %r，必须为整数", keycode)
+            raise ValueError(f"keycode 必须是整数: {keycode!r}")
+        return self._run_shell_bool(f"input keyevent {keycode}", "按键")
+
+    def press_back(self) -> bool:
+        """
+        模拟按下返回键（KeyEvent 4）。
+
+        返回
+        -------
+        bool
+            True 表示命令执行成功；False 表示失败。
+        """
+        return self.input_keyevent(4)
+
+    def press_home(self) -> bool:
+        """
+        模拟按下 Home 键（KeyEvent 3）。
+
+        返回
+        -------
+        bool
+            True 表示命令执行成功；False 表示失败。
+        """
+        return self.input_keyevent(3)
+
+    def press_recent(self) -> bool:
+        """
+        模拟按下最近任务键（KeyEvent 187）。
+
+        返回
+        -------
+        bool
+            True 表示命令执行成功；False 表示失败。
+        """
+        return self.input_keyevent(187)
+
+    def app_start(self, package: str) -> bool:
+        """
+        启动应用。
+
+        优先使用 `am start` 按包名匹配 LAUNCHER 活动启动（比 -n 更通用，
+        无需活动名）；失败（stderr 非空或异常）时回退到 `monkey` 启动器
+        兜底。
+
+        参数
+        ----------
+        package : str
+            应用包名（仅允许字母数字/下划线/点，如 com.example.app）。
+
+        返回
+        -------
+        bool
+            True 表示任一启动方式成功；False 表示均失败。
+
+        异常
+        ------
+        ValueError
+            包名非法或 serial 含注入字符时抛出。
+        """
+        self._assert_serial_safe()
+        if not isinstance(package, str) or not self._PACKAGE_PATTERN.match(package):
+            logger.warning("无效的包名: %r", package)
+            raise ValueError(f"无效的包名: {package!r}")
+
+        # 主通道：am start 按包名匹配 LAUNCHER 活动
+        am_command = (
+            f"am start -a android.intent.action.MAIN "
+            f"-c android.intent.category.LAUNCHER -p {package}"
+        )
+        if self._run_shell_bool(am_command, "启动应用(am start)"):
+            logger.info("启动应用成功: %s", package)
+            return True
+
+        # 兜底通道：monkey 启动器
+        monkey_command = (
+            f"monkey -p {package} -c android.intent.category.LAUNCHER 1"
+        )
+        if self._run_shell_bool(monkey_command, "启动应用(monkey)"):
+            logger.info("启动应用成功（monkey 兜底）: %s", package)
+            return True
+
+        logger.warning("启动应用失败: %s", package)
+        return False
+
+    def app_stop(self, package: str) -> bool:
+        """
+        强制停止应用。
+
+        通过 `am force-stop` 停止指定包名的应用（含后台进程）。
+
+        参数
+        ----------
+        package : str
+            应用包名（仅允许字母数字/下划线/点）。
+
+        返回
+        -------
+        bool
+            True 表示命令执行成功；False 表示失败。
+
+        异常
+        ------
+        ValueError
+            包名非法或 serial 含注入字符时抛出。
+        """
+        self._assert_serial_safe()
+        if not isinstance(package, str) or not self._PACKAGE_PATTERN.match(package):
+            logger.warning("无效的包名: %r", package)
+            raise ValueError(f"无效的包名: {package!r}")
+        return self._run_shell_bool(f"am force-stop {package}", "停止应用")
+
+    def list_packages(self, include_system: bool = False) -> list[str]:
+        """
+        列出已安装应用包名。
+
+        通过 `pm list packages` 查询。include_system=False（默认）使用
+        -3 仅列三方包；include_system=True 使用 -s 仅列系统包。
+        解析输出中 "package:" 前缀，跳过无法识别的行。
+
+        参数
+        ----------
+        include_system : bool
+            是否仅列出系统包，默认 False（仅列三方包）。
+
+        返回
+        -------
+        list[str]
+            包名列表；命令失败、输出无效或 stderr 非空时返回空列表。
+
+        异常
+        ------
+        ValueError
+            serial 含注入字符时抛出。
+        """
+        self._assert_serial_safe()
+        flag = "-s" if include_system else "-3"
+        command = f"pm list packages {flag}"
+        try:
+            stdout, stderr = self.shell(command)
+        except Exception as exc:
+            logger.error("列出包命令执行异常: %s", exc)
+            return []
+
+        # 命令失败判定：输出无效或 stderr 非空均视为失败，容错返回空列表
+        if not isinstance(stdout, str) or not stdout.strip():
+            logger.warning("列出包命令无有效输出，stderr: %s", stderr)
+            return []
+        if stderr.strip():
+            logger.warning("列出包命令返回 stderr，视为失败: %s", stderr.strip())
+            return []
+
+        packages: list[str] = []
+        for line in stdout.splitlines():
+            line = line.strip()
+            if line.startswith("package:"):
+                packages.append(line[len("package:"):].strip())
+        logger.info("列出包完成，条数: %d", len(packages))
+        return packages
+
+    def get_window_focus(self) -> str:
+        """
+        获取当前焦点窗口。
+
+        通过 `dumpsys window windows` 查询并解析 mCurrentFocus 字段。
+        注意：不使用 "grep mCurrentFocus" 管道形式（管道符会被 shell
+        注入防御拒绝），改为 Python 侧过滤输出，更安全。
+
+        返回
+        -------
+        str
+            焦点窗口描述（"mCurrentFocus=" 之后的内容）；未找到、焦点
+            为 null、命令失败或异常时返回 ""。
+
+        异常
+        ------
+        ValueError
+            serial 含注入字符时抛出。
+        """
+        self._assert_serial_safe()
+        try:
+            stdout, stderr = self.shell("dumpsys window windows")
+        except Exception as exc:
+            logger.error("查询焦点窗口命令执行异常: %s", exc)
+            return ""
+
+        # 命令失败判定：输出无效或 stderr 非空均视为失败，容错返回空字符串
+        if not isinstance(stdout, str) or not stdout.strip():
+            logger.warning("查询焦点窗口无有效输出，stderr: %s", stderr)
+            return ""
+        if stderr.strip():
+            logger.warning("查询焦点窗口返回 stderr，视为失败: %s", stderr.strip())
+            return ""
+
+        for line in stdout.splitlines():
+            line = line.strip()
+            if "mCurrentFocus" not in line:
+                continue
+            # 形如 mCurrentFocus=Window{...} 或 mCurrentFocus=null
+            focus = line.split("=", 1)[1].strip() if "=" in line else ""
+            if not focus or focus == "null":
+                return ""
+            return focus
+        return ""
+
+    def get_resolution(self) -> tuple[int, int]:
+        """
+        获取屏幕分辨率。
+
+        通过 `wm size` 查询并解析 "Physical size: WxH"。
+
+        返回
+        -------
+        tuple[int, int]
+            (宽, 高)；命令失败或解析失败时返回 (0, 0)（容错，不抛出）。
+
+        异常
+        ------
+        ValueError
+            serial 含注入字符时抛出。
+        """
+        self._assert_serial_safe()
+        try:
+            stdout, stderr = self.shell("wm size")
+        except Exception as exc:
+            logger.error("查询分辨率命令执行异常: %s", exc)
+            return (0, 0)
+
+        # 命令失败判定：输出无效或 stderr 非空均视为失败，容错返回 (0, 0)
+        if not isinstance(stdout, str) or not stdout.strip():
+            logger.warning("查询分辨率无有效输出，stderr: %s", stderr)
+            return (0, 0)
+        if stderr.strip():
+            logger.warning("查询分辨率返回 stderr，视为失败: %s", stderr.strip())
+            return (0, 0)
+
+        match = self._PHYSICAL_SIZE_PATTERN.search(stdout)
+        if not match:
+            logger.warning("分辨率输出中未找到 Physical size 字段，返回 (0, 0)")
+            return (0, 0)
+        return int(match.group(1)), int(match.group(2))
