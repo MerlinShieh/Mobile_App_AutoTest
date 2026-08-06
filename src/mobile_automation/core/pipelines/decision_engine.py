@@ -20,6 +20,7 @@ from typing import Optional
 from ...logger import get_logger
 from ...config import settings
 from ...device.device_manager import DeviceManager
+from ...llm.base import LLMMessage
 from ...llm.llm_service import LLMService
 from ...llm.token_budget import TokenBudgetManager
 from ...models.action import Action, ActionParams
@@ -30,6 +31,13 @@ from ...prompts.decision_prompt import DecisionPromptBuilder
 from ...reporting.archiver import DataArchiver
 
 logger = get_logger(__name__)
+
+_RETRY_JSON_PROMPT: str = (
+    "你上次的输出不是合法 JSON，请严格输出合法 JSON，不要包含多余文本。"
+    "请重新给出完整决策，使用 <answer> 标签包裹 JSON 操作指令，"
+    "不要引用或重复上次的非法输出。"
+)
+"""LLM 响应 JSON 解析失败时的引擎内自动重试修正提示。"""
 
 
 class DecisionEngine:
@@ -129,24 +137,70 @@ class DecisionEngine:
             enable_reasoning=enable_reasoning,
         )
 
+        step_index: int = task_context.current_step + 1
+        response: str = self._chat_and_archive(messages, step_index, attempt)
+
+        try:
+            action: Action = self.parse_llm_response(response)
+        except ValueError as exc:
+            # ---- 解析失败：引擎内自动重新请求 1 次（仅解析失败触发，网络/超时等异常不在此捕获） ----
+            logger.warning(
+                "Step %d LLM 响应 JSON 解析失败，触发引擎内自动重试 1 次: %s\n原始响应片段: %s",
+                step_index, exc, response[:200],
+            )
+            retry_messages: list[LLMMessage] = messages + [
+                LLMMessage(role="user", content=_RETRY_JSON_PROMPT)
+            ]
+            logger.info("Step %d 自动重试 LLM 请求（追加修正提示）", step_index)
+            response = self._chat_and_archive(retry_messages, step_index, attempt + 1)
+            logger.info("Step %d LLM 重试响应片段: %s", step_index, response[:200])
+            # 第 2 次解析仍失败则按原逻辑抛异常，保持既有步骤重试兜底
+            action = self.parse_llm_response(response)
+
+        return action
+
+    def _chat_and_archive(
+        self,
+        messages: list[LLMMessage],
+        step_index: int,
+        attempt: int,
+    ) -> str:
+        """
+        调用 LLM 并归档本次请求/响应，同时记录 Token 消耗。
+
+        每次真实 chat 调用都会独立记录 Token 消耗（估算），
+        保证重试请求正常计入、不重复不遗漏。
+
+        参数
+        ----------
+        messages : list[LLMMessage]
+            发送给 LLM 的消息列表。
+        step_index : int
+            当前步骤序号（从 1 开始）。
+        attempt : int
+            本步骤的第几次 LLM 调用序号（用于归档文件区分）。
+
+        返回
+        -------
+        str
+            LLM 返回的原始响应文本。
+        """
         response: str = self._llm.chat(messages)
-        logger.debug("Step %d LLM 原始响应: %s", task_context.current_step + 1, response[:200])
+        logger.debug("Step %d LLM 原始响应: %s", step_index, response[:200])
 
         self._archive_llm_interaction(
-            task_context.current_step + 1,
+            step_index,
             [{"role": m.role, "content": m.content} for m in messages],
             response,
             attempt=attempt,
         )
 
-        action: Action = self.parse_llm_response(response)
-
-        # ---- 记录 Token 消耗（解析成功后记录，避免解析失败虚增消耗） ----
+        # 每次真实调用后记录 Token 消耗，重试请求同样计入
         if self._token_budget is not None:
             actual_tokens = self._token_budget.estimate_messages_tokens(messages)
             self._token_budget.record_usage(actual_tokens)
 
-        return action
+        return response
 
     def resolve_action_coordinates(self, action: Action, perceptual: PerceptualResult) -> None:
         """

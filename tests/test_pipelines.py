@@ -184,6 +184,76 @@ class TestDecisionEngine:
 
         mock_budget.needs_compression.assert_not_called()
 
+    def test_decide_action_retries_on_invalid_json_then_succeeds(self, mocker, mock_device_manager, mock_llm_service):
+        """第 1 次响应非法 JSON + 第 2 次合法 → 解析成功，LLM chat 被调用 2 次。"""
+        mock_llm_service.chat.side_effect = [
+            "这不是 JSON",  # 第 1 次：非法
+            '{"action_type": "click", "params": {"element_id": "#1"}, "reason": "重试成功"}',
+        ]
+        engine = DecisionEngine(device_manager=mock_device_manager, llm_service=mock_llm_service)
+        ui_tree = _make_ui_tree()
+        perceptual = _make_perceptual(ui_tree, mocker)
+        context = TaskContext(task_id="t", user_goal="打开设置")
+
+        action = engine.decide_action(perceptual, context, attempt=1)
+
+        assert action.action_type == ActionType.CLICK
+        assert action.params.element_id == "#1"
+        assert mock_llm_service.chat.call_count == 2
+        # 第 2 次请求在原消息基础上追加了重试修正提示
+        first_messages = mock_llm_service.chat.call_args_list[0].args[0]
+        second_messages = mock_llm_service.chat.call_args_list[1].args[0]
+        assert len(second_messages) == len(first_messages) + 1
+        assert "不是合法 JSON" in second_messages[-1].content
+
+    def test_decide_action_retries_both_invalid_raises(self, mocker, mock_device_manager, mock_llm_service):
+        """两次均非法 JSON → 抛出原解析异常，LLM chat 被调用 2 次。"""
+        mock_llm_service.chat.side_effect = ["这不是 JSON", "仍然不是 JSON"]
+        engine = DecisionEngine(device_manager=mock_device_manager, llm_service=mock_llm_service)
+        ui_tree = _make_ui_tree()
+        perceptual = _make_perceptual(ui_tree, mocker)
+        context = TaskContext(task_id="t", user_goal="打开设置")
+
+        with pytest.raises(ValueError, match="LLM 响应解析失败"):
+            engine.decide_action(perceptual, context, attempt=1)
+
+        assert mock_llm_service.chat.call_count == 2
+
+    def test_decide_action_valid_first_no_retry(self, mocker, mock_device_manager, mock_llm_service):
+        """第 1 次即合法 → 不触发重试，LLM chat 只调用 1 次。"""
+        engine = DecisionEngine(device_manager=mock_device_manager, llm_service=mock_llm_service)
+        ui_tree = _make_ui_tree()
+        perceptual = _make_perceptual(ui_tree, mocker)
+        context = TaskContext(task_id="t", user_goal="打开设置")
+
+        action = engine.decide_action(perceptual, context, attempt=1)
+
+        assert action.action_type == ActionType.CLICK
+        mock_llm_service.chat.assert_called_once()
+
+    def test_decide_action_retry_records_token_twice(self, mocker, mock_device_manager, mock_llm_service):
+        """重试成功时 Token 消耗记录 2 次（每次真实调用各记一次，不重复不遗漏）。"""
+        mock_llm_service.chat.side_effect = [
+            "这不是 JSON",
+            '{"action_type": "click", "params": {"element_id": "#1"}, "reason": "ok"}',
+        ]
+        mock_budget = mocker.MagicMock()
+        mock_budget.estimate_messages_tokens.return_value = 100
+        mock_budget.needs_compression.return_value = False
+        engine = DecisionEngine(
+            device_manager=mock_device_manager,
+            llm_service=mock_llm_service,
+            token_budget=mock_budget,
+        )
+        ui_tree = _make_ui_tree()
+        perceptual = _make_perceptual(ui_tree, mocker)
+        context = TaskContext(task_id="t", user_goal="测试")
+
+        engine.decide_action(perceptual, context, attempt=1)
+
+        assert mock_budget.record_usage.call_count == 2
+        mock_budget.record_usage.assert_called_with(100)
+
     def test_parse_llm_response_co_t_format(self):
         """验证 CoT <think>/<answer> 标签格式解析。"""
         response = (
