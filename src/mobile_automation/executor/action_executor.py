@@ -28,6 +28,19 @@ from .wait_executor import WaitExecutor
 
 logger = get_logger(__name__)
 
+# 系统级查询动作集合：不改变页面，仅读取系统信息（短信/剪贴板/通知/通话状态）。
+# 查询结果由执行器写入 action.params.result，供编排层收集并注入下一轮 LLM 决策。
+_QUERY_ACTION_TYPES: frozenset[ActionType] = frozenset({
+    ActionType.READ_SMS,
+    ActionType.GET_CLIPBOARD,
+    ActionType.GET_NOTIFICATIONS,
+    ActionType.GET_CALL_STATE,
+})
+
+# 查询动作默认参数（LLM 未指定时使用）
+_QUERY_DEFAULT_LIMIT: int = 20
+_SMS_TYPES: tuple[str, ...] = ("inbox", "sent")
+
 
 class ActionExecutor:
     """
@@ -111,6 +124,8 @@ class ActionExecutor:
 
             executor = self._executors.get(action.action_type)
             if executor is None:
+                if action.action_type in _QUERY_ACTION_TYPES:
+                    return self._execute_query_action(action)
                 return self._execute_system_action(action)
 
             result: bool = executor.execute(action)
@@ -120,6 +135,80 @@ class ActionExecutor:
         except Exception as exc:
             logger.error("Action 执行异常: type=%s, error=%s", action.action_type.value, exc)
             raise
+
+    def _execute_query_action(self, action: Action) -> bool:
+        """
+        执行系统级查询动作（READ_SMS / GET_CLIPBOARD / GET_NOTIFICATIONS / GET_CALL_STATE）。
+
+        通过 ADB 控制器读取系统信息（短信 / 剪贴板 / 通知 / 通话状态），
+        查询结果写入 action.params.result 供编排层收集；参数缺失或非法时
+        回退默认值（sms_type=inbox / limit=20），保证 LLM 输出宽松。
+        查询动作不改变页面，成功即返回 True。
+
+        参数
+        ----------
+        action : Action
+            系统查询指令，执行成功后其 params.result 携带查询结果。
+
+        返回
+        -------
+        bool
+            执行是否成功（查询命令执行成功即 True；ADB 层对内容解析失败
+            已容错返回空值，此处不视为失败）。
+        """
+        try:
+            adb = self._dm.get_adb()
+
+            if action.action_type == ActionType.READ_SMS:
+                sms_type = action.params.sms_type
+                if sms_type not in _SMS_TYPES:
+                    if sms_type:
+                        logger.warning("无效的短信类型 %r，回退默认 inbox", sms_type)
+                    sms_type = "inbox"
+                result = adb.get_sms_messages(
+                    sms_type=sms_type,
+                    limit=self._normalize_limit(action.params.limit),
+                )
+            elif action.action_type == ActionType.GET_CLIPBOARD:
+                result = adb.get_clipboard()
+            elif action.action_type == ActionType.GET_NOTIFICATIONS:
+                result = adb.get_notifications(limit=self._normalize_limit(action.params.limit))
+            elif action.action_type == ActionType.GET_CALL_STATE:
+                result = adb.get_call_state()
+            else:
+                logger.warning("未知的查询动作类型: %s", action.action_type)
+                return False
+
+            action.params.result = result
+            logger.info("系统查询执行成功: type=%s", action.action_type.value)
+            return True
+        except Exception as exc:
+            logger.error("系统查询执行失败: type=%s, error=%s", action.action_type.value, exc)
+            action.params.result = None
+            return False
+
+    @staticmethod
+    def _normalize_limit(limit: object) -> int:
+        """
+        归一化查询条数上限：非正整数（含 None/字符串/0/负数）回退默认 20。
+
+        参数
+        ----------
+        limit : object
+            LLM 传入的 limit 参数（可能为 None / 非法字符串）。
+
+        返回
+        -------
+        int
+            合法正整数原样返回，否则返回默认 20。
+        """
+        try:
+            value = int(limit)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return _QUERY_DEFAULT_LIMIT
+        if value <= 0:
+            return _QUERY_DEFAULT_LIMIT
+        return value
 
     def _execute_system_action(self, action: Action) -> bool:
         """

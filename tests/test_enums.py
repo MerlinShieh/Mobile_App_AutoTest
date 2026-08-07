@@ -43,10 +43,14 @@ class TestActionType:
         assert ActionType.ROTATE_SCREEN.value == "rotate_screen"
         assert ActionType.VOLUME_UP.value == "volume_up"
         assert ActionType.VOLUME_DOWN.value == "volume_down"
+        assert ActionType.READ_SMS.value == "read_sms"
+        assert ActionType.GET_CLIPBOARD.value == "get_clipboard"
+        assert ActionType.GET_NOTIFICATIONS.value == "get_notifications"
+        assert ActionType.GET_CALL_STATE.value == "get_call_state"
 
     def test_total_members(self):
         """验证 ActionType 成员数量完整。"""
-        assert len(ActionType) == 22
+        assert len(ActionType) == 26
 
     def test_from_string_valid(self):
         """测试通过字符串值创建枚举。"""

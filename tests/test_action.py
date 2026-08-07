@@ -122,6 +122,29 @@ class TestActionValidation:
             action = Action(at, ActionParams())
             assert action.validate() == []
 
+    def test_system_query_actions_pass_without_params(self):
+        """系统查询类动作参数全部可选，空参数也通过校验。
+
+        覆盖 READ_SMS / GET_CLIPBOARD / GET_NOTIFICATIONS / GET_CALL_STATE：
+        sms_type/limit 缺省时由执行器使用默认值，validate 不做强制校验，
+        保证 LLM 输出宽松。
+        """
+        for at in [ActionType.READ_SMS, ActionType.GET_CLIPBOARD,
+                   ActionType.GET_NOTIFICATIONS, ActionType.GET_CALL_STATE]:
+            action = Action(at, ActionParams())
+            assert action.validate() == []
+
+    def test_system_query_actions_pass_with_optional_params(self):
+        """系统查询类动作携带可选参数（sms_type/limit）时同样通过校验。"""
+        sms = Action(ActionType.READ_SMS, ActionParams(sms_type="sent", limit=5))
+        assert sms.validate() == []
+        assert sms.params.sms_type == "sent"
+        assert sms.params.limit == 5
+
+        notifications = Action(ActionType.GET_NOTIFICATIONS, ActionParams(limit=10))
+        assert notifications.validate() == []
+        assert notifications.params.limit == 10
+
 
 class TestActionToDict:
     """测试 Action.to_dict() 序列化。"""

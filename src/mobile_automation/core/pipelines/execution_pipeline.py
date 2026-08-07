@@ -83,8 +83,11 @@ class ExecutionPipeline:
         self._dm.health_check()
 
         # 非变更操作：跳过验证，直接成功
+        # （含系统查询类：读取短信/剪贴板/通知/通话状态不改变页面）
         if record.action.action_type in (
             ActionType.SCREENSHOT, ActionType.WAIT, ActionType.TERMINATE, ActionType.VERIFY,
+            ActionType.READ_SMS, ActionType.GET_CLIPBOARD,
+            ActionType.GET_NOTIFICATIONS, ActionType.GET_CALL_STATE,
         ):
             record.page_summary = (
                 perceptual.ui_tree.structured_summary

@@ -7,7 +7,7 @@ LLM 输出 element_id（如 "#1"），系统从本地索引查询完整信息后
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from .enums import ActionType
 from ..logger import get_logger
@@ -67,6 +67,12 @@ class ActionParams:
     retry_interval_ms: int = 2000
     match: bool = False
     """验证操作的匹配结果（true=匹配/验证通过, false=不匹配/验证失败），用于 VERIFY 动作。"""
+    sms_type: Optional[str] = None
+    """短信类型，用于 READ_SMS：可选 "inbox"（收件箱）或 "sent"（已发送），默认 inbox。"""
+    limit: Optional[int] = None
+    """查询条数上限，用于 READ_SMS / GET_NOTIFICATIONS，默认 20。"""
+    result: Any = None
+    """系统查询动作的执行结果（由执行器写入）：短信为 list[dict]、剪贴板为 str、通知为 list[dict]、通话状态为 dict。"""
 
     def to_dict(self) -> dict:
         """
@@ -123,6 +129,8 @@ class Action:
         - SWIPE / SWIPE_POINT：需要至少 2 个轨迹点
         - SCROLL：需要 direction 字段
         - OPEN_APP：需要 package_name
+        - 系统查询类（READ_SMS / GET_CLIPBOARD / GET_NOTIFICATIONS / GET_CALL_STATE）：
+          参数均为可选（sms_type/limit 缺省时执行器使用默认值），不做强制校验
 
         返回
         -------
@@ -153,6 +161,8 @@ class Action:
         elif self.action_type == ActionType.OPEN_APP:
             if not p.package_name:
                 missing.append("package_name")
+        # 系统查询类（READ_SMS / GET_CLIPBOARD / GET_NOTIFICATIONS / GET_CALL_STATE）：
+        # 参数均可选（sms_type/limit 缺省时执行器使用默认值），不做强制校验，保证 LLM 输出宽松。
 
         if missing:
             logger.warning("Action 参数校验未通过: %s", missing)

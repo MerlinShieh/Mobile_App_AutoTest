@@ -70,6 +70,14 @@ class ActionType(str, Enum):
     """调高媒体音量，通过 ADB 发送音量+键事件"""
     VOLUME_DOWN = "volume_down"
     """调低媒体音量，通过 ADB 发送音量-键事件"""
+    READ_SMS = "read_sms"
+    """读取设备短信（系统级查询），参数 sms_type（inbox/sent）与 limit，用于自动化测试中读取短信验证码等"""
+    GET_CLIPBOARD = "get_clipboard"
+    """读取系统剪贴板文本（系统级查询），用于读取复制的验证码、口令等文本内容"""
+    GET_NOTIFICATIONS = "get_notifications"
+    """读取系统通知列表（系统级查询），参数 limit，用于查看通知中的验证码、提醒等"""
+    GET_CALL_STATE = "get_call_state"
+    """读取设备通话状态（系统级查询），返回 state/incoming_number，用于检测来电与通话场景"""
 
 
 class StepStatus(str, Enum):

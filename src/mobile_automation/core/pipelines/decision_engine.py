@@ -118,6 +118,7 @@ class DecisionEngine:
                 step_index=task_context.current_step + 1,
                 compression_strategy="none",
                 enable_reasoning=enable_reasoning,
+                system_query_results=task_context.system_query_results,
             )
             estimated = self._token_budget.estimate_messages_tokens(preview_msgs)
 
@@ -135,6 +136,7 @@ class DecisionEngine:
             step_index=task_context.current_step + 1,
             compression_strategy=compression_strategy,
             enable_reasoning=enable_reasoning,
+            system_query_results=task_context.system_query_results,
         )
 
         step_index: int = task_context.current_step + 1
@@ -361,6 +363,8 @@ class DecisionEngine:
                     duration_ms=params_dict.get("duration_ms", 1500),
                     package_name=params_dict.get("package_name"),
                     match=params_dict.get("match", False),
+                    sms_type=params_dict.get("sms_type"),
+                    limit=params_dict.get("limit"),
                 ),
                 reason=data.get("reason", ""),
             )

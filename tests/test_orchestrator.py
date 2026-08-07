@@ -326,3 +326,145 @@ class TestTaskOrchestrator:
         context1 = orchestrator.execute_task("任务1", max_steps=1)
         context2 = orchestrator.execute_task("任务2", max_steps=1)
         assert context1.task_id != context2.task_id
+
+    # ------------------------------------------------------------------
+    # 系统查询结果收集（system_query_results）
+    # ------------------------------------------------------------------
+
+    def _build_query_record(self, step_index, action_type, result, status=StepStatus.SUCCESS):
+        """构造一条查询动作步骤记录，params.result 携带查询结果。"""
+        return StepRecord(
+            step_index=step_index,
+            action=Action(action_type, ActionParams(result=result)),
+            status=status,
+            page_summary="某页面",
+        )
+
+    def test_execute_task_collects_query_result(self, mocker):
+        """验证查询类动作执行后结果格式化并追加到 system_query_results。"""
+        mock_step_runner = mocker.MagicMock()
+        mock_step_runner.run_step.return_value = self._build_query_record(
+            1, ActionType.GET_CLIPBOARD, "验证码 888888",
+        )
+        mock_token_budget = mocker.MagicMock()
+
+        orchestrator = TaskOrchestrator(
+            step_runner=mock_step_runner,
+            token_budget=mock_token_budget,
+        )
+
+        context = orchestrator.execute_task(user_goal="读取剪贴板", max_steps=1)
+        assert context.status == TaskStatus.COMPLETED
+        assert len(context.system_query_results) == 1
+        assert context.system_query_results[0].startswith("get_clipboard: ")
+        assert "验证码 888888" in context.system_query_results[0]
+
+    def test_execute_task_collects_sms_result(self, mocker):
+        """验证 read_sms 查询结果（list[dict]）格式化为 JSON 摘要。"""
+        mock_step_runner = mocker.MagicMock()
+        mock_step_runner.run_step.return_value = self._build_query_record(
+            1, ActionType.READ_SMS,
+            [{"address": "10086", "body": "验证码 123456", "date": 1700000000000}],
+        )
+        mock_token_budget = mocker.MagicMock()
+
+        orchestrator = TaskOrchestrator(
+            step_runner=mock_step_runner,
+            token_budget=mock_token_budget,
+        )
+
+        context = orchestrator.execute_task(user_goal="读取短信", max_steps=1)
+        assert context.status == TaskStatus.COMPLETED
+        assert len(context.system_query_results) == 1
+        assert context.system_query_results[0].startswith("read_sms: ")
+        assert "验证码 123456" in context.system_query_results[0]
+
+    def test_execute_task_query_result_truncated(self, mocker):
+        """验证超长查询结果被截断至 200 字符。"""
+        mock_step_runner = mocker.MagicMock()
+        mock_step_runner.run_step.return_value = self._build_query_record(
+            1, ActionType.GET_CLIPBOARD, "长" * 1000,
+        )
+        mock_token_budget = mocker.MagicMock()
+
+        orchestrator = TaskOrchestrator(
+            step_runner=mock_step_runner,
+            token_budget=mock_token_budget,
+        )
+
+        context = orchestrator.execute_task(user_goal="读取剪贴板", max_steps=1)
+        assert len(context.system_query_results) == 1
+        assert len(context.system_query_results[0]) <= 200 + len("get_clipboard: ") + len("...")
+        assert context.system_query_results[0].endswith("...")
+
+    def test_execute_task_query_results_capped_at_five(self, mocker):
+        """验证 system_query_results 最多保留 5 条，超出丢弃最旧。"""
+        mock_step_runner = mocker.MagicMock()
+        mock_token_budget = mocker.MagicMock()
+
+        # 连续执行 7 个查询步骤（混合查询类型，避免触发死循环检测）
+        query_types = [
+            ActionType.READ_SMS, ActionType.GET_CLIPBOARD,
+            ActionType.GET_NOTIFICATIONS, ActionType.GET_CALL_STATE,
+            ActionType.READ_SMS, ActionType.GET_CLIPBOARD, ActionType.GET_NOTIFICATIONS,
+        ]
+        mock_step_runner.run_step.side_effect = [
+            self._build_query_record(i + 1, at, {"ok": True})
+            for i, at in enumerate(query_types)
+        ]
+
+        orchestrator = TaskOrchestrator(
+            step_runner=mock_step_runner,
+            token_budget=mock_token_budget,
+        )
+
+        context = orchestrator.execute_task(user_goal="查询系统信息", max_steps=7)
+        assert context.status == TaskStatus.COMPLETED
+        assert len(context.system_query_results) == 5
+        # 最旧的 2 条（read_sms、get_clipboard）被丢弃，保留第 3~7 条
+        assert context.system_query_results[0].startswith("get_notifications: ")
+        assert context.system_query_results[-1].startswith("get_notifications: ")
+        assert all('"ok": true' in r for r in context.system_query_results)
+
+    def test_execute_task_query_result_none_recorded(self, mocker):
+        """验证查询失败（result=None）时记录「无结果」占位，任务不受影响。"""
+        mock_step_runner = mocker.MagicMock()
+        mock_step_runner.run_step.return_value = self._build_query_record(
+            1, ActionType.GET_NOTIFICATIONS, None,
+        )
+        mock_token_budget = mocker.MagicMock()
+
+        orchestrator = TaskOrchestrator(
+            step_runner=mock_step_runner,
+            token_budget=mock_token_budget,
+        )
+
+        context = orchestrator.execute_task(user_goal="读取通知", max_steps=1)
+        assert context.status == TaskStatus.COMPLETED
+        assert len(context.system_query_results) == 1
+        assert "无结果" in context.system_query_results[0]
+
+    def test_execute_task_query_action_does_not_terminate(self, mocker):
+        """验证查询类动作不触发 TERMINATE 逻辑，执行后正常进入下一步。"""
+        mock_step_runner = mocker.MagicMock()
+        mock_token_budget = mocker.MagicMock()
+
+        mock_step_runner.run_step.side_effect = [
+            self._build_query_record(1, ActionType.GET_CLIPBOARD, "内容"),
+            StepRecord(
+                step_index=2,
+                action=Action(ActionType.TERMINATE, ActionParams()),
+                status=StepStatus.SUCCESS,
+                page_summary="目标已达成",
+            ),
+        ]
+
+        orchestrator = TaskOrchestrator(
+            step_runner=mock_step_runner,
+            token_budget=mock_token_budget,
+        )
+
+        context = orchestrator.execute_task(user_goal="查询后结束", max_steps=0)
+        assert context.status == TaskStatus.COMPLETED
+        assert context.current_step == 2
+        assert len(context.system_query_results) == 1

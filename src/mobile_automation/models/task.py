@@ -111,6 +111,10 @@ class TaskContext:
         已执行的所有步骤记录。
     page_history : list[str]
         历史页面的结构化摘要列表，用于 LLM 上下文。
+    system_query_results : list[str]
+        系统查询结果（短信/剪贴板/通知/通话状态）的格式化摘要列表，
+        保存本轮执行中查询动作收集到的系统信息，供下一轮 LLM 决策参考。
+        由编排层维护：每条截断至 200 字符，最多保留 5 条（超出丢弃最旧）。
     total_tokens_used : int
         已消耗的总 Token 数。
     estimated_remaining : int
@@ -131,6 +135,7 @@ class TaskContext:
     max_steps: int = 30
     steps: list[StepRecord] = field(default_factory=list)
     page_history: list[str] = field(default_factory=list)
+    system_query_results: list[str] = field(default_factory=list)
     total_tokens_used: int = 0
     estimated_remaining: int = 0
     max_context_tokens: int = 32000

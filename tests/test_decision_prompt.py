@@ -205,3 +205,116 @@ class TestDecisionPromptInputFlow:
         assert "点击输入框只是第一步" in system_text
         assert "软键盘会弹出" in system_text
         assert "clear_text" in system_text
+
+
+class TestSystemQueryResultsInjection:
+    """验证系统查询结果（system_query_results）注入行为。"""
+
+    @pytest.fixture
+    def builder(self):
+        return DecisionPromptBuilder()
+
+    def test_query_results_injected_as_separate_message(self, builder):
+        """验证非空查询结果注入为独立 user 消息，位于历史与当前步骤之间。"""
+        messages = builder.build(
+            user_goal="读取短信验证码",
+            screenshot=SAMPLE_SCREENSHOT,
+            structured_summary=SAMPLE_SUMMARY,
+            history=["步骤 1: 打开短信应用"],
+            step_index=2,
+            compression_strategy="none",
+            system_query_results=[
+                "read_sms: [{'address': '10086', 'body': '验证码 123456', 'date': 1700000000000}]",
+            ],
+        )
+        # system + history + query_results + current
+        assert len(messages) == 4
+        assert "## 历史步骤摘要" in messages[1].content
+        assert "## 系统查询结果" in messages[2].content
+        assert "read_sms:" in messages[2].content
+        assert "验证码 123456" in messages[2].content
+        # 当前步骤消息保持 user 消息（含截图）
+        assert isinstance(messages[3].content, list)
+
+    def test_multiple_query_results_all_included(self, builder):
+        """验证多条查询结果逐条以「- 」列表形式注入。"""
+        messages = builder.build(
+            user_goal="查询系统信息",
+            screenshot=SAMPLE_SCREENSHOT,
+            structured_summary=SAMPLE_SUMMARY,
+            history=None,
+            compression_strategy="none",
+            system_query_results=[
+                "get_clipboard: 复制内容",
+                "get_call_state: {'state': 'ringing', 'incoming_number': '138'}",
+            ],
+        )
+        assert len(messages) == 3  # system + query_results + current
+        query_text = messages[1].content
+        assert query_text.startswith("## 系统查询结果")
+        assert "- get_clipboard: 复制内容" in query_text
+        assert "- get_call_state:" in query_text
+
+    def test_query_results_none_keeps_old_behavior(self, builder):
+        """验证 system_query_results=None 时不注入，消息结构与旧行为完全一致。"""
+        messages_with = builder.build(
+            user_goal="测试",
+            screenshot=SAMPLE_SCREENSHOT,
+            structured_summary=SAMPLE_SUMMARY,
+            history=["步骤 1: 首页"],
+            compression_strategy="none",
+            system_query_results=None,
+        )
+        messages_without = builder.build(
+            user_goal="测试",
+            screenshot=SAMPLE_SCREENSHOT,
+            structured_summary=SAMPLE_SUMMARY,
+            history=["步骤 1: 首页"],
+            compression_strategy="none",
+        )
+        assert len(messages_with) == len(messages_without) == 3
+        assert messages_with[1].content == messages_without[1].content
+        assert messages_with[2].content == messages_without[2].content
+
+    def test_query_results_empty_list_not_injected(self, builder):
+        """验证空列表同样不注入（保持消息数不变）。"""
+        messages = builder.build(
+            user_goal="测试",
+            screenshot=SAMPLE_SCREENSHOT,
+            structured_summary=SAMPLE_SUMMARY,
+            history=None,
+            compression_strategy="none",
+            system_query_results=[],
+        )
+        assert len(messages) == 2  # system + current
+
+    def test_system_prompt_contains_query_capability(self, builder):
+        """验证 system prompt 包含系统查询能力说明与新操作类型。"""
+        messages = builder.build(
+            user_goal="读取短信验证码",
+            screenshot=SAMPLE_SCREENSHOT,
+            structured_summary=SAMPLE_SUMMARY,
+            history=None,
+            compression_strategy="none",
+        )
+        system_text = messages[0].content
+        assert "read_sms" in system_text
+        assert "get_clipboard" in system_text
+        assert "get_notifications" in system_text
+        assert "get_call_state" in system_text
+        assert "短信验证码" in system_text
+
+    def test_no_reasoning_prompt_contains_query_capability(self, builder):
+        """验证关闭思维链时的 system prompt 同样包含系统查询能力说明。"""
+        messages = builder.build(
+            user_goal="读取通知",
+            screenshot=SAMPLE_SCREENSHOT,
+            structured_summary=SAMPLE_SUMMARY,
+            history=None,
+            compression_strategy="none",
+            enable_reasoning=False,
+        )
+        system_text = messages[0].content
+        assert "read_sms" in system_text
+        assert "get_call_state" in system_text
+        assert "系统查询" in system_text

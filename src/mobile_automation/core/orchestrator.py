@@ -17,6 +17,7 @@
     5. 更新状态
 """
 
+import json
 import uuid
 from typing import Optional
 
@@ -33,6 +34,19 @@ from ..reporting.report_generator import ReportGenerator
 from .step_runner import StepRunner
 
 logger = get_logger(__name__)
+
+# 系统级查询动作集合：执行后不终止/不验证，结果写入 context.system_query_results
+# 供下一轮 LLM 决策参考（格式化见 _record_system_query_result）。
+_QUERY_ACTION_TYPES: frozenset[ActionType] = frozenset({
+    ActionType.READ_SMS,
+    ActionType.GET_CLIPBOARD,
+    ActionType.GET_NOTIFICATIONS,
+    ActionType.GET_CALL_STATE,
+})
+
+# 系统查询结果摘要的保存上限：单条截断字符数与最多保留条数
+_QUERY_RESULT_MAX_CHARS: int = 200
+_QUERY_RESULT_MAX_ITEMS: int = 5
 
 
 class TaskOrchestrator:
@@ -139,6 +153,11 @@ class TaskOrchestrator:
                 record = self._step_runner.run_step(step_index, context)
                 context.add_step(record)
 
+                # ---- 系统查询结果收集（在特殊动作处理之前） ----
+                # 查询类动作不触发 TERMINATE/VERIFY，结果格式化后暂存供下一轮决策
+                if record.action.action_type in _QUERY_ACTION_TYPES:
+                    self._record_system_query_result(context, record.action)
+
                 # ---- 特殊动作处理（在 is_success 分支之前） ----
                 if record.action.action_type == ActionType.TERMINATE:
                     context.status = TaskStatus.COMPLETED
@@ -219,6 +238,41 @@ class TaskOrchestrator:
         logger.info("任务 %s 结束: status=%s, steps=%d, tokens=%d",
                      context.task_id, context.status.value, context.current_step, context.total_tokens_used)
         return context
+
+    def _record_system_query_result(self, context: TaskContext, action: Action) -> None:
+        """
+        收集并保存系统查询结果摘要到任务上下文。
+
+        查询类动作（read_sms/get_clipboard/get_notifications/get_call_state）
+        执行后，将 action.params.result 格式化为「查询类型: 结果摘要」字符串
+        append 到 context.system_query_results。单条截断至 200 字符，
+        最多保留 5 条，超出时丢弃最旧条目。查询失败（result 为 None）时
+        记录「无结果」占位，供 LLM 感知查询未生效。
+
+        参数
+        ----------
+        context : TaskContext
+            任务上下文，其 system_query_results 会被修改。
+        action : Action
+            已执行的查询动作，params.result 为查询结果。
+        """
+        result = getattr(action.params, "result", None)
+        if result is None:
+            summary = "无结果"
+        else:
+            try:
+                summary = json.dumps(result, ensure_ascii=False)
+            except (TypeError, ValueError):
+                summary = str(result)
+            if len(summary) > _QUERY_RESULT_MAX_CHARS:
+                summary = summary[:_QUERY_RESULT_MAX_CHARS] + "..."
+
+        entry = f"{action.action_type.value}: {summary}"
+        context.system_query_results.append(entry)
+        if len(context.system_query_results) > _QUERY_RESULT_MAX_ITEMS:
+            context.system_query_results.pop(0)
+        logger.debug("任务 %s 系统查询结果已记录: %s（当前 %d 条）",
+                     context.task_id, entry[:_QUERY_RESULT_MAX_CHARS], len(context.system_query_results))
 
     def _check_timeout(self, context: TaskContext, max_duration: Optional[float] = None) -> bool:
         """

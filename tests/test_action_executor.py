@@ -238,6 +238,106 @@ class TestActionExecutor:
         assert result is True
         mock_adb.set_rotation.assert_called_once_with(0)
 
+    # ------------------------------------------------------------------
+    # 系统级查询动作（READ_SMS / GET_CLIPBOARD / GET_NOTIFICATIONS / GET_CALL_STATE）
+    # ------------------------------------------------------------------
+
+    def test_execute_read_sms_dispatches_to_adb(self, mocker):
+        """验证 READ_SMS 调用 ADB get_sms_messages，参数透传，结果写入 params.result。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        sms_result = [{"address": "10086", "body": "验证码 123456", "date": 1700000000000}]
+        mock_adb.get_sms_messages.return_value = sms_result
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.READ_SMS, ActionParams(sms_type="inbox", limit=3))
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.get_sms_messages.assert_called_once_with(sms_type="inbox", limit=3)
+        assert action.params.result == sms_result
+
+    def test_execute_read_sms_invalid_type_falls_back_inbox(self, mocker):
+        """验证 READ_SMS 非法 sms_type 回退 inbox，非法 limit 回退 20。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_adb.get_sms_messages.return_value = []
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.READ_SMS, ActionParams(sms_type="received", limit="abc"))  # type: ignore[arg-type]
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.get_sms_messages.assert_called_once_with(sms_type="inbox", limit=20)
+
+    def test_execute_get_clipboard_dispatches_to_adb(self, mocker):
+        """验证 GET_CLIPBOARD 调用 ADB get_clipboard，结果写入 params.result。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_adb.get_clipboard.return_value = "复制内容 ABC"
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.GET_CLIPBOARD, ActionParams())
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.get_clipboard.assert_called_once()
+        assert action.params.result == "复制内容 ABC"
+
+    def test_execute_get_notifications_dispatches_to_adb(self, mocker):
+        """验证 GET_NOTIFICATIONS 调用 ADB get_notifications，limit 透传。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_adb.get_notifications.return_value = [{"package": "com.android.mms", "title": "验证码", "text": "123456"}]
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.GET_NOTIFICATIONS, ActionParams(limit=5))
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.get_notifications.assert_called_once_with(limit=5)
+        assert action.params.result == [{"package": "com.android.mms", "title": "验证码", "text": "123456"}]
+
+    def test_execute_get_call_state_dispatches_to_adb(self, mocker):
+        """验证 GET_CALL_STATE 调用 ADB get_call_state，结果写入 params.result。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_adb.get_call_state.return_value = {"state": "ringing", "state_code": 1, "incoming_number": "13800000000"}
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.GET_CALL_STATE, ActionParams())
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.get_call_state.assert_called_once()
+        assert action.params.result == {"state": "ringing", "state_code": 1, "incoming_number": "13800000000"}
+
+    def test_execute_query_action_failure_returns_false(self, mocker):
+        """验证查询动作执行异常时返回 False 且 result 置 None。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_adb.get_clipboard.side_effect = RuntimeError("adb 异常")
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.GET_CLIPBOARD, ActionParams())
+        result = executor.execute(action)
+        assert result is False
+        assert action.params.result is None
+
+    def test_execute_query_action_no_params_passes_validation(self, mocker):
+        """验证查询动作空参数通过 validate（不抛 ValueError）并执行。"""
+        mock_dm = mocker.MagicMock()
+        mock_adb = mocker.MagicMock()
+        mock_adb.get_notifications.return_value = []
+        mock_dm.get_adb.return_value = mock_adb
+
+        executor = ActionExecutor(mock_dm)
+        action = Action(ActionType.GET_NOTIFICATIONS, ActionParams())
+        result = executor.execute(action)
+        assert result is True
+        mock_adb.get_notifications.assert_called_once_with(limit=20)
+
     def test_executor_initialization_creates_sub_executors(self, mocker):
         """验证初始化时创建所有子执行器。"""
         mock_dm = mocker.MagicMock()
