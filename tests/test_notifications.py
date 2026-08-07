@@ -10,18 +10,18 @@ import pytest
 from mobile_automation.device.adb_controller import ADBController
 
 
-# 典型 dumpsys notification --noredact 输出（Android 10+，StringValue 包裹格式）
+# 典型 dumpsys notification 输出（真实 MIUI 格式：0x... 后带冒号）
 TYPICAL_OUTPUT = """\
 Current notification status:
   Notification List (user=0):
-    NotificationRecord(0x0197e345 pkg=com.android.mms user=UserHandle{0} id=1005 tag=null uid=10023)
+    NotificationRecord(0x0197e345: pkg=com.android.mms user=UserHandle{0} id=1005 tag=null uid=10023)
       icon=0x7f0801b4
       pri=2 score=0
       key=0|com.android.mms|1005|null|10023
       contentIntent=PendingIntent{...}
       tickerText=null
       extras=Bundle[{android.title=StringValue{短信通知}, android.text=StringValue{验证码 123456}, android.subText=StringValue{}, ...}]
-    NotificationRecord(0x0197e346 pkg=com.android.vending user=UserHandle{0} id=42 tag=null uid=10020)
+    NotificationRecord(0x0197e346: pkg=com.android.vending user=UserHandle{0} id=42 tag=null uid=10020)
       icon=0x7f0801c1
       pri=1 score=0
       key=0|com.android.vending|42|null|10020
@@ -171,10 +171,48 @@ class TestGetNotifications:
         assert result[0]["package"] == "com.android.mms"
 
     def test_command_shape(self, mocker):
-        """读取命令为 dumpsys notification --noredact。"""
+        """读取命令为 dumpsys notification（不带 --noredact）。"""
         controller = ADBController("test-serial")
         mock_shell = mocker.patch.object(controller, "shell", return_value=("", ""))
 
         controller.get_notifications()
 
-        assert mock_shell.call_args[0][0] == "dumpsys notification --noredact"
+        assert mock_shell.call_args[0][0] == "dumpsys notification"
+        assert "--noredact" not in mock_shell.call_args[0][0]
+
+    def test_parse_redacted_title_text_empty(self, mocker):
+        """无 --noredact 时 title/text 脱敏为 String [length=N]，置空字符串。"""
+        stdout = (
+            "Current notification status:\n"
+            "  Notification List (user=0):\n"
+            "    NotificationRecord(0x0197e345 pkg=com.android.mms user=UserHandle{0} id=1005 tag=null uid=10023)\n"
+            "      icon=0x7f0801b4\n"
+            "      extras=Bundle[{android.title=String [length=11], android.text=String [length=32], android.subText=String [length=0], ...}]\n"
+        )
+        controller = ADBController("test-serial")
+        mocker.patch.object(controller, "shell", return_value=(stdout, ""))
+
+        result = controller.get_notifications()
+
+        assert result == [{"package": "com.android.mms", "title": "", "text": ""}]
+
+    def test_parse_mixed_redacted_and_plain(self, mocker):
+        """同一输出中脱敏与完整通知混合时分别正确处理。"""
+        stdout = (
+            "  Notification List (user=0):\n"
+            "    NotificationRecord(0x01 pkg=com.android.mms user=UserHandle{0} id=1 tag=null uid=1000)\n"
+            "      extras=Bundle[{android.title=String [length=11], android.text=String [length=32], ...}]\n"
+            "    NotificationRecord(0x02 pkg=com.example.app user=UserHandle{0} id=2 tag=null uid=1001)\n"
+            "      extras=Bundle[{android.title=StringValue{完整标题}, android.text=StringValue{完整正文}, ...}]\n"
+        )
+        controller = ADBController("test-serial")
+        mocker.patch.object(controller, "shell", return_value=(stdout, ""))
+
+        result = controller.get_notifications()
+
+        assert result[0] == {"package": "com.android.mms", "title": "", "text": ""}
+        assert result[1] == {
+            "package": "com.example.app",
+            "title": "完整标题",
+            "text": "完整正文",
+        }

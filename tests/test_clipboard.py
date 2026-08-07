@@ -63,14 +63,93 @@ class TestGetClipboard:
 
         assert controller.get_clipboard() == ""
 
-    def test_get_clipboard_command_shape(self, mocker):
-        """读取命令为 cmd clipboard get（Android 10+ 系统命令）。"""
+    def test_get_clipboard_fallback_command_shape(self, mocker):
+        """service call 通道失败时回退命令为 cmd clipboard get（标准 ROM）。"""
         controller = ADBController("test-serial")
-        mock_shell = mocker.patch.object(controller, "shell", return_value=("x", ""))
+        mock_shell = mocker.patch.object(
+            controller,
+            "shell",
+            side_effect=[("x\n", ""), ("y\n", "")],
+        )
 
         controller.get_clipboard()
 
-        assert mock_shell.call_args[0][0] == "cmd clipboard get"
+        assert mock_shell.call_args_list[0][0][0] == "service call clipboard 1"
+        assert mock_shell.call_args_list[1][0][0] == "cmd clipboard get"
+
+    def test_get_clipboard_primary_command_service_call(self, mocker):
+        """读取优先走 service call clipboard 1（部分定制 ROM 无 cmd clipboard）。"""
+        stdout = (
+            "Result: Parcel(\n"
+            "  0x00000000: 00000000 00000000 00650068 006c006c '........e.h.l.l'\n"
+            "  0x00000010: 0000006f 00000000 00000000 00000000 'o..............'\n"
+            ")\n"
+        )
+        controller = ADBController("test-serial")
+        mock_shell = mocker.patch.object(controller, "shell", return_value=(stdout, ""))
+
+        text = controller.get_clipboard()
+
+        assert text == "hello"
+        assert mock_shell.call_count == 1
+        assert mock_shell.call_args[0][0] == "service call clipboard 1"
+
+    def test_get_clipboard_service_call_empty_returns_empty(self, mocker):
+        """service call 返回 "No items"（剪贴板为空）时返回空字符串。"""
+        stdout = (
+            "Result: Parcel(\n"
+            "  0x00000000: 00000000 00000000 006f004e 00690020 '........N.o. .i'\n"
+            "  0x00000010: 00650074 0073006d 00000000 00000000 't.e.m.s........'\n"
+            "  0x00000020: 00000000 00000000 00000000 00000000 '................'\n"
+            ")\n"
+        )
+        controller = ADBController("test-serial")
+        mock_shell = mocker.patch.object(controller, "shell", return_value=(stdout, ""))
+
+        assert controller.get_clipboard() == ""
+        assert mock_shell.call_count == 1
+        assert mock_shell.call_args[0][0] == "service call clipboard 1"
+
+    def test_get_clipboard_service_call_single_line_parcel(self, mocker):
+        """兼容单行 Parcel(...) 输出格式。"""
+        stdout = "Result: Parcel(00000000 00000000 00650068 006c006c 0000006f)\n"
+        controller = ADBController("test-serial")
+        mocker.patch.object(controller, "shell", return_value=(stdout, ""))
+
+        assert controller.get_clipboard() == "hello"
+
+    def test_get_clipboard_service_call_fallback_to_cmd(self, mocker):
+        """service call 通道失败（无 Parcel 输出）时回退 cmd clipboard get。"""
+        controller = ADBController("test-serial")
+        mock_shell = mocker.patch.object(
+            controller,
+            "shell",
+            side_effect=[
+                ("No shell command implementation\n", ""),
+                ("hello world\n", ""),
+            ],
+        )
+
+        assert controller.get_clipboard() == "hello world"
+
+        assert mock_shell.call_count == 2
+        assert mock_shell.call_args_list[0][0][0] == "service call clipboard 1"
+        assert mock_shell.call_args_list[1][0][0] == "cmd clipboard get"
+
+    def test_get_clipboard_service_call_stderr_fallback(self, mocker):
+        """service call 返回 stderr 时回退 cmd clipboard get。"""
+        controller = ADBController("test-serial")
+        mock_shell = mocker.patch.object(
+            controller,
+            "shell",
+            side_effect=[
+                ("Result: Parcel(...)", "Error: unknown transaction"),
+                ("cmd 内容\n", ""),
+            ],
+        )
+
+        assert controller.get_clipboard() == "cmd 内容"
+        assert mock_shell.call_count == 2
 
     def test_get_clipboard_injection_serial_rejected(self):
         """serial 含注入字符时 get_clipboard 抛出 ValueError。"""

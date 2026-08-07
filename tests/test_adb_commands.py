@@ -451,6 +451,45 @@ WINDOW MANAGER WINDOWS (dumpsys window windows)
 
         assert controller.get_window_focus() == ""
 
+    def test_command_shape(self, mocker):
+        """查询命令为 dumpsys window（兼容不输出 mCurrentFocus 的 ROM）。"""
+        controller = ADBController("test-serial")
+        mock_shell = mocker.patch.object(controller, "shell", return_value=("", ""))
+
+        controller.get_window_focus()
+
+        assert mock_shell.call_args[0][0] == "dumpsys window"
+
+    def test_parse_focused_app_priority(self, mocker):
+        """MIUI ROM：优先解析 mFocusedApp 提取「包名/Activity」。"""
+        stdout = (
+            "WINDOW MANAGER WINDOWS (dumpsys window)\n"
+            "  mCurrentFocus=Window{d8d9d01 u0 PopupWindow:1ca877a}\n"
+            "  mFocusedApp=ActivityRecord{133663800 u0 com.miui.calculator/.cal.CalculatorActivity t47}\n"
+        )
+        controller = ADBController("test-serial")
+        mocker.patch.object(controller, "shell", return_value=(stdout, ""))
+
+        assert (
+            controller.get_window_focus()
+            == "com.miui.calculator/.cal.CalculatorActivity"
+        )
+
+    def test_focused_app_null_fallback_to_current_focus(self, mocker):
+        """mFocusedApp=null 时回退解析 mCurrentFocus 的 Window 名。"""
+        stdout = (
+            "WINDOW MANAGER WINDOWS (dumpsys window)\n"
+            "  mCurrentFocus=Window{abc123 u0 com.android.settings/com.android.settings.Settings}\n"
+            "  mFocusedApp=null\n"
+        )
+        controller = ADBController("test-serial")
+        mocker.patch.object(controller, "shell", return_value=(stdout, ""))
+
+        assert (
+            controller.get_window_focus()
+            == "Window{abc123 u0 com.android.settings/com.android.settings.Settings}"
+        )
+
     def test_injection_serial_rejected(self):
         """serial 含注入字符时抛 ValueError。"""
         controller = ADBController("test-serial;rm -rf /")

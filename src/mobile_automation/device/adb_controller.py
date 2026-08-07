@@ -42,19 +42,26 @@ class ADBController:
     # 短信读取支持的类型（对应 content://sms 的 URI 段）
     _SMS_TYPES = ("inbox", "sent")
 
-    # content query 行解析：
-    # - address 非贪婪，遇到首个 ", body=" 即停止
-    # - body 贪婪，可包含逗号/等号，直到行内最后一个 ", date="
+    # content query 行解析（命令不带 projection/sort-order/limit，Row 行
+    # 为完整字段行，字段顺序在不同 ROM 上不固定，故逐字段独立匹配）：
+    # - address 不含逗号/空白（NULL 原样保留）
     # - date 为毫秒时间戳数字
-    _SMS_ROW_PATTERN = re.compile(
-        r"^Row:\s*\d+\s+address=(.*?),\s+body=(.*),\s+date=(\d+)\s*$"
-    )
+    # - body 非贪婪，取到下一个字段名（, 字段名=）或行尾
+    _SMS_ADDRESS_PATTERN = re.compile(r"address=([^,\s]+)")
+    _SMS_DATE_PATTERN = re.compile(r"date=(\d+)")
+    _SMS_BODY_PATTERN = re.compile(r"body=(.*?)(?:,\s*[a-z_]+=|$)")
 
     # dumpsys notification 输出中 NotificationRecord 段落定位：
     # 形如 NotificationRecord(0x0197e345 pkg=com.android.mms user=... )，
     # 捕获 pkg 之后的包名（到空白或右括号为止）。
     _NOTIFICATION_RECORD_PATTERN = re.compile(
-        r"NotificationRecord\(\s*0x[0-9a-fA-F]+\s+pkg=([^\s\)]+)"
+        r"NotificationRecord\(\s*0x[0-9a-fA-F]+\s*:?\s+pkg=([^\s\)]+)"
+    )
+
+    # dumpsys window 输出中的焦点应用定位（优先于 mCurrentFocus 使用）：
+    # mFocusedApp=ActivityRecord{hash u0 包名/Activity tN}
+    _FOCUSED_APP_PATTERN = re.compile(
+        r"mFocusedApp=ActivityRecord\{[^}]*\s([A-Za-z0-9_.]+/[A-Za-z0-9_.]+)\s+t\d+\}"
     )
 
     # dumpsys telephony.registry 通话状态码 → 人类可读名
@@ -298,13 +305,10 @@ class ADBController:
             raise ValueError(f"serial 含可疑字符，已拒绝执行: {self.serial!r}")
 
         # 2. 构造并执行 content query 命令
-        # --sort-order 的值含空格，用双引号包裹以保证设备 shell 正确传参
-        command = (
-            f"content query --uri content://sms/{sms_type} "
-            "--projection address,body,date "
-            '--sort-order "date DESC" '
-            f"--limit {limit}"
-        )
+        # 部分定制 ROM 的 content query 不支持 --projection/--sort-order/
+        # --limit 参数（报 usage），故不带任何附加参数；由 Python 侧
+        # 按 date 降序排序并截取 limit 条
+        command = f"content query --uri content://sms/{sms_type}"
         try:
             stdout, stderr = self.shell(command)
         except Exception as exc:
@@ -320,23 +324,36 @@ class ADBController:
             return []
 
         # 4. 解析 content query 输出（逐行，跳过无法解析的行）
+        # Row 行为完整字段行（_id/thread_id/address/.../body/...），
+        # body 可能含中文、逗号与 URL，逐字段独立正则提取
         messages: list[dict] = []
         for line in stdout.splitlines():
             line = line.strip()
             if not line or not line.startswith("Row:"):
                 continue
-            match = self._SMS_ROW_PATTERN.match(line)
-            if not match:
-                logger.warning("短信行解析失败，跳过: %s", line)
+            address_match = self._SMS_ADDRESS_PATTERN.search(line)
+            date_match = self._SMS_DATE_PATTERN.search(line)
+            if not address_match or not date_match:
+                logger.warning("短信行解析失败（缺 address/date），跳过: %s", line)
                 continue
-            address = match.group(1).strip()
-            body = match.group(2).strip()
+            body_match = self._SMS_BODY_PATTERN.search(line)
+            body = body_match.group(1).strip() if body_match else ""
             try:
-                date = int(match.group(3))
+                date = int(date_match.group(1))
             except ValueError:
-                logger.warning("短信日期解析失败，跳过: %s", match.group(3))
+                logger.warning("短信日期解析失败，跳过: %s", date_match.group(1))
                 continue
-            messages.append({"address": address, "body": body, "date": date})
+            messages.append(
+                {
+                    "address": address_match.group(1).strip(),
+                    "body": body,
+                    "date": date,
+                }
+            )
+
+        # 5. 命令不带 --sort-order，Python 侧按 date 降序排序并截取 limit 条
+        messages.sort(key=lambda item: item["date"], reverse=True)
+        messages = messages[:limit]
 
         logger.info("读取短信完成，类型: %s，条数: %d", sms_type, len(messages))
         return messages
@@ -345,8 +362,11 @@ class ADBController:
         """
         读取系统剪贴板文本（系统级能力，Android 10+）。
 
-        通过 `cmd clipboard get` 读取剪贴板内容。命令失败、无权限、
-        无内容或 shell 异常时返回空字符串（容错，不抛异常）。
+        优先通过 `service call clipboard 1`（TRANSACTION_getPrimaryClip）
+        读取剪贴板 Parcel 中的 UTF-16 文本（部分定制 ROM 无 `cmd clipboard`
+        命令）；该通道失败时回退到 `cmd clipboard get`。剪贴板为空
+        （Parcel 内为 "No items"）、命令失败、无权限或 shell 异常时
+        返回空字符串（容错，不抛异常）。
 
         返回
         -------
@@ -363,6 +383,13 @@ class ADBController:
             logger.warning("serial 含可疑字符，已拒绝读取剪贴板: %r", self.serial)
             raise ValueError(f"serial 含可疑字符，已拒绝执行: {self.serial!r}")
 
+        # 主通道：service call clipboard 1（该 ROM 无 cmd clipboard）
+        text = self._get_clipboard_via_service_call()
+        if text is not None:
+            logger.info("读取剪贴板完成（service call），长度: %d", len(text))
+            return text
+
+        # 回退通道：cmd clipboard get（标准 ROM）
         try:
             stdout, stderr = self.shell("cmd clipboard get")
         except Exception as exc:
@@ -378,8 +405,116 @@ class ADBController:
             return ""
 
         text = stdout.strip()
-        logger.info("读取剪贴板完成，长度: %d", len(text))
+        logger.info("读取剪贴板完成（cmd clipboard），长度: %d", len(text))
         return text
+
+    def _get_clipboard_via_service_call(self) -> Optional[str]:
+        """
+        通过 service call 读取剪贴板文本（无 cmd clipboard 的 ROM 通道）。
+
+        `service call clipboard 1` 返回 Parcel，剪贴板文本为 UTF-16LE 编码
+        （跳过前 8 字节头）。剪贴板为空时文本为 "No items"。
+
+        返回
+        -------
+        Optional[str]
+            剪贴板文本；空剪贴板返回 ""；命令失败、stderr 非空或 Parcel
+            解析失败返回 None（表示该通道不可用，由调用方回退 cmd clipboard）。
+        """
+        try:
+            stdout, stderr = self.shell("service call clipboard 1")
+        except Exception as exc:
+            logger.warning("service call 读取剪贴板异常: %s", exc)
+            return None
+        if not isinstance(stdout, str) or not stdout.strip():
+            return None
+        if stderr.strip():
+            logger.warning(
+                "service call 剪贴板返回 stderr，回退 cmd clipboard: %s",
+                stderr.strip(),
+            )
+            return None
+
+        raw = self._extract_parcel_hex(stdout)
+        if not raw:
+            logger.warning("service call 剪贴板输出无有效 Parcel 数据，回退 cmd clipboard")
+            return None
+
+        text = self._decode_clipboard_payload(raw)
+        # 空剪贴板：Parcel 内为 UTF-16LE 的 "No items"
+        if text == "No items":
+            logger.info("剪贴板为空（service call 返回 No items）")
+            return ""
+        # 解码为空或含不可见控制字符（可能含长度字段等额外结构），
+        # 视为格式不匹配，回退 cmd clipboard
+        if not text or any(ord(ch) < 32 and ch not in "\t\n\r" for ch in text):
+            logger.warning(
+                "service call 剪贴板解码异常（无内容或含控制字符），回退 cmd clipboard"
+            )
+            return None
+        return text
+
+    @staticmethod
+    def _extract_parcel_hex(output: str) -> bytes:
+        """
+        从 service call 输出的 Parcel 中提取数据字节。
+
+        兼容两种输出格式：
+        - 多行块格式：``0x00000000: 00000000 006f004e '........N.o'``
+        - 单行格式：``Result: Parcel(00000000 006f004e ...)``
+
+        返回
+        -------
+        bytes
+            拼接后的 Parcel 原始字节；无法解析时返回 b""。
+        """
+        hex_parts: list[str] = []
+        for line in output.splitlines():
+            # 去掉行内 ASCII 注解（单引号片段），避免误提取 hex 字符
+            line = re.sub(r"'[^']*'", "", line)
+            # 单行 Parcel(...) 格式
+            match = re.search(r"Parcel\(\s*([0-9a-fA-F\s]+?)\s*\)", line)
+            if match:
+                hex_parts.append(match.group(1))
+                continue
+            # 多行块格式：冒号后为 4 字节一组的数据
+            match = re.search(r":\s*([0-9a-fA-F]{8}(?:\s+[0-9a-fA-F]{8})*)", line)
+            if match:
+                hex_parts.append(match.group(1))
+        if not hex_parts:
+            return b""
+        joined = "".join(hex_parts).replace(" ", "").replace("\t", "")
+        # service call 以 4 字节小端字显示（如 006f004e 对应内存 4e 00 6f 00），
+        # 需按字节对（每 2 个 hex 字符）倒序翻转还原真实字节
+        flipped_hex = "".join(
+            "".join(joined[i : i + 8][j : j + 2] for j in range(6, -1, -2))
+            for i in range(0, len(joined), 8)
+        )
+        try:
+            return bytes.fromhex(flipped_hex)
+        except ValueError:
+            return b""
+
+    @staticmethod
+    def _decode_clipboard_payload(raw: bytes) -> str:
+        """
+        将剪贴板 Parcel 数据解码为 UTF-16LE 文本。
+
+        跳过前 8 字节 Parcel 头，按 2 字节小端解码，遇 0x0000 截断。
+
+        返回
+        -------
+        str
+            解码后的文本；无有效数据时返回 ""。
+        """
+        payload = raw[8:]
+        chars: list[str] = []
+        for i in range(0, len(payload) - 1, 2):
+            code = payload[i] | (payload[i + 1] << 8)
+            if code == 0:
+                break
+            chars.append(chr(code))
+        return "".join(chars)
 
     def set_clipboard(self, text: str) -> bool:
         """
@@ -387,6 +522,11 @@ class ADBController:
 
         通过 `cmd clipboard set` 写入剪贴板。文本经 shlex.quote 转义，
         保证含空格/引号等特殊字符时在设备 shell 中正确传参。
+
+        注意：部分定制 ROM（如 MIUI/HyperOS）不提供 cmd clipboard 服务
+        （get 需经 service call 通道读取）；该 ROM 上 set 需手工构造
+        ClipData Parcel 过于复杂，保持现状不支持——命令失败时返回 False
+        并记录警告日志。
 
         参数
         ----------
@@ -413,6 +553,9 @@ class ADBController:
             logger.warning("写入剪贴板失败: 文本为空或 None")
             return False
 
+        # 部分定制 ROM（MIUI/HyperOS）无 cmd clipboard 服务，set 需构造
+        # ClipData Parcel 过于复杂，保持现状不支持（失败时记录警告日志）
+        logger.debug("set_clipboard 使用 cmd clipboard set；该命令在无此服务的 ROM 上不支持")
         command = f"cmd clipboard set {shlex.quote(text)}"
         try:
             _, stderr = self.shell(command)
@@ -432,11 +575,12 @@ class ADBController:
         """
         从通知段落文本中提取指定 Bundle key 的值（兼容多种格式）。
 
-        dumpsys notification --noredact 输出中 extra 的展示格式不固定，
-        常见两种：
-        - key=StringValue{内容}（对象包裹）
-        - key=内容（直接明文，如 android.title=验证码通知）
-        按优先级依次尝试，均失败返回空字符串（容错，不抛异常）。
+        dumpsys notification 输出中 extra 的展示格式不固定，常见几种：
+        - key=StringValue{内容}（--noredact 时对象包裹）
+        - key=String [length=N]（无 --noredact 时脱敏，仅长度无内容）
+        - key=明文（直接展示，如 android.title=验证码通知）
+        按优先级依次尝试，脱敏、未找到或解析失败均返回空字符串
+        （容错，不抛异常）。
 
         参数
         ----------
@@ -448,16 +592,25 @@ class ADBController:
         返回
         -------
         str
-            提取到的值（已 trim）；未找到时返回 ""。
+            提取到的值（已 trim）；脱敏、未找到或解析失败时返回 ""。
         """
-        # 格式1: key=StringValue{...}，非贪婪匹配到首个右花括号
+        # 格式1: key=StringValue{...}（--noredact 常见），非贪婪匹配到首个右花括号
         match = re.search(
             rf"{re.escape(key)}=StringValue\{{(.*?)\}}", block, re.DOTALL
         )
         if match:
             return match.group(1).strip()
-        # 格式2: key=值（取到行尾）
-        match = re.search(rf"{re.escape(key)}=([^\r\n]+)", block)
+        # 格式2: key=String [length=N]（无 --noredact 时脱敏，仅长度无内容），置空
+        match = re.search(
+            rf"{re.escape(key)}=String\s*\[\s*length=\d+\s*\]", block
+        )
+        if match:
+            return ""
+        # 格式3: key=明文（取到行尾或下一个 ", key="，兼容直接明文格式）
+        match = re.search(
+            rf"{re.escape(key)}=([^\r\n]*?)(?:,\s*[A-Za-z_.]+=|\r?\n|$)",
+            block,
+        )
         if match:
             return match.group(1).strip()
         return ""
@@ -466,11 +619,13 @@ class ADBController:
         """
         读取系统通知（系统级能力）。
 
-        通过 `dumpsys notification --noredact` 读取通知列表（--noredact
-        显示完整文本）。解析输出中的 NotificationRecord 条目，提取每个
-        通知的包名、标题与正文。无通知、命令失败或解析失败时返回空列表
-        （容错，不抛异常）。返回顺序遵循 dumpsys 输出顺序（系统通常
-        按通知时间排列）。
+        通过 `dumpsys notification` 读取通知列表。部分定制 ROM 下
+        --noredact 会导致输出无 NotificationRecord（仅 "Notification List:"
+        头），故去掉该参数；无 --noredact 时 title/text 可能被脱敏为
+        "String [length=N]"（仅长度无内容），此时置空字符串。
+        解析输出中的 NotificationRecord 条目，提取每个通知的包名、标题
+        与正文。无通知、命令失败或解析失败时返回空列表（容错，不抛异常）。
+        返回顺序遵循 dumpsys 输出顺序（系统通常按通知时间排列）。
 
         参数
         ----------
@@ -481,7 +636,7 @@ class ADBController:
         -------
         list[dict]
             通知列表，每项形如 {"package": str, "title": str, "text": str}；
-            title/text 提取失败时为 ""。
+            title/text 提取失败或脱敏时为 ""。
 
         异常
         ------
@@ -504,8 +659,10 @@ class ADBController:
             raise ValueError(f"serial 含可疑字符，已拒绝执行: {self.serial!r}")
 
         # 2. 构造并执行 dumpsys notification 命令
+        # 部分定制 ROM 下 --noredact 会导致无 NotificationRecord 输出，
+        # 去掉该参数；title/text 可能被脱敏为 "String [length=N]"
         try:
-            stdout, stderr = self.shell("dumpsys notification --noredact")
+            stdout, stderr = self.shell("dumpsys notification")
         except Exception as exc:
             logger.error("读取通知命令执行异常: %s", exc)
             return []
@@ -1073,15 +1230,17 @@ class ADBController:
         """
         获取当前焦点窗口。
 
-        通过 `dumpsys window windows` 查询并解析 mCurrentFocus 字段。
-        注意：不使用 "grep mCurrentFocus" 管道形式（管道符会被 shell
-        注入防御拒绝），改为 Python 侧过滤输出，更安全。
+        通过 `dumpsys window` 查询。优先解析 mFocusedApp 提取
+        「包名/Activity」（如 com.miui.calculator/.cal.CalculatorActivity，
+        对自动化更实用）；未找到时回退解析 mCurrentFocus 的 Window 名。
+        注意：不使用 "grep" 管道形式（管道符会被 shell 注入防御拒绝），
+        改为 Python 侧过滤输出，更安全。
 
         返回
         -------
         str
-            焦点窗口描述（"mCurrentFocus=" 之后的内容）；未找到、焦点
-            为 null、命令失败或异常时返回 ""。
+            焦点应用描述（包名/Activity）或焦点窗口描述（Window{...}）；
+            未找到、焦点为 null、命令失败或异常时返回 ""。
 
         异常
         ------
@@ -1090,7 +1249,7 @@ class ADBController:
         """
         self._assert_serial_safe()
         try:
-            stdout, stderr = self.shell("dumpsys window windows")
+            stdout, stderr = self.shell("dumpsys window")
         except Exception as exc:
             logger.error("查询焦点窗口命令执行异常: %s", exc)
             return ""
@@ -1103,6 +1262,12 @@ class ADBController:
             logger.warning("查询焦点窗口返回 stderr，视为失败: %s", stderr.strip())
             return ""
 
+        # 1. 优先解析 mFocusedApp 提取「包名/Activity」（更实用）
+        focus_match = self._FOCUSED_APP_PATTERN.search(stdout)
+        if focus_match:
+            return focus_match.group(1).strip()
+
+        # 2. 回退：解析 mCurrentFocus 的 Window 名
         for line in stdout.splitlines():
             line = line.strip()
             if "mCurrentFocus" not in line:
@@ -1110,7 +1275,7 @@ class ADBController:
             # 形如 mCurrentFocus=Window{...} 或 mCurrentFocus=null
             focus = line.split("=", 1)[1].strip() if "=" in line else ""
             if not focus or focus == "null":
-                return ""
+                continue
             return focus
         return ""
 
